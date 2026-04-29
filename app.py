@@ -237,4 +237,4 @@ elif menu == "Prediction":
 # ======================
 # FOOTER
 # ======================
-st.markdown("<hr><p style='text-align:center;'>Developed by Wiz</p>", unsafe_allow_html=True)
+#st.markdown("<hr><p style='text-align:center;'>Developed by Wiz</p>", unsafe_allow_html=True)
