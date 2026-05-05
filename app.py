@@ -62,7 +62,7 @@ st.markdown("""
 # HEADER
 # ======================
 st.markdown("""
-<h1 style='text-align:center;'>🏠 House Rent Prediction Dashboard</h1>
+<h1 style='text-align:center;'>Indian House Rent Prediction</h1>
 <p style='text-align:center;color:#64ffda;'>Optimized Random Forest Model</p>
 """, unsafe_allow_html=True)
 
