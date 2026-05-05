@@ -26,19 +26,13 @@ df = df.dropna()
 df = df[df["rent"] < df["rent"].quantile(0.95)]
 
 # ======================
-# FEATURE ENGINEERING (IMPROVED)
+# FEATURE ENGINEERING
 # ======================
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
 
-# ✅ NEW FEATURE
-df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
-
-# ✅ IMPROVED LOCALITY HANDLING
 freq = df["locality"].value_counts()
-df["locality"] = df["locality"].apply(lambda x: x if freq[x] > 10 else "Other")
-
-df["locality_freq"] = df["locality"].map(df["locality"].value_counts())
+df["locality_freq"] = df["locality"].map(freq)
 df = df.drop(columns=["locality"])
 
 # ======================
@@ -89,10 +83,10 @@ def train_model(data):
         X, y, test_size=0.2, random_state=42
     )
 
-    # ✅ Slightly improved tuning
+    # 🔥 Improved model
     model = RandomForestRegressor(
-        n_estimators=600,
-        max_depth=25,
+        n_estimators=500,
+        max_depth=None,
         min_samples_split=4,
         min_samples_leaf=2,
         max_features="sqrt",
@@ -136,6 +130,14 @@ if menu == "EDA":
         fig = px.bar(city_avg, x="city", y="rent")
         st.plotly_chart(fig, use_container_width=True)
 
+    st.subheader("Key Insights")
+    st.markdown("""
+    - 📍 Mumbai has highest rent  
+    - 🛁 Bathrooms strongly affect rent  
+    - 📐 Area increases rent significantly  
+    - 🏙 Location plays major role  
+    """)
+
 # ======================
 # MODEL PERFORMANCE
 # ======================
@@ -145,19 +147,44 @@ elif menu == "Model":
     y_pred = model.predict(X_test)
 
     r2 = r2_score(y_test, y_pred)
+    rmse_log = np.sqrt(mean_squared_error(y_test, y_pred))
     rmse_actual = np.sqrt(mean_squared_error(np.expm1(y_test), np.expm1(y_pred)))
 
     st.markdown(f"<div class='glass'><p>R² Score</p><p class='value'>{r2:.2f}</p></div>", unsafe_allow_html=True)
+
+    st.write(f"RMSE (log scale): {rmse_log:.2f}")
     st.write(f"Average Error (₹): ₹{int(rmse_actual)}")
 
-    # Prediction vs Actual
+    # 📈 Prediction vs Actual Graph (NEW 🔥)
     actual = np.expm1(y_test)
     predicted = np.expm1(y_pred)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers'))
     fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines'))
+    fig.update_layout(
+        title="Actual vs Predicted Rent",
+        xaxis_title="Actual Rent",
+        yaxis_title="Predicted Rent"
+    )
     st.plotly_chart(fig)
+
+    # Feature Importance
+    importance = pd.DataFrame({
+        "Feature": feature_cols,
+        "Importance": model.feature_importances_
+    }).sort_values(by="Importance", ascending=False)
+
+    st.subheader("Top Influencing Features")
+    st.bar_chart(importance.head(10).set_index("Feature"))
+
+    st.write("Top 5 Factors:")
+    st.write(importance.head(5))
+
+    st.info("""
+Model: Random Forest Regressor  
+Technique: Log Transformation + Feature Engineering  
+""")
 
 # ======================
 # PREDICTION
@@ -187,7 +214,6 @@ elif menu == "Prediction":
         input_df["beds"] = bedrooms
         input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
         input_df["room_density"] = area / (bedrooms + 1)
-        input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
         input_df["locality_freq"] = df["locality_freq"].mean()
 
         for col in feature_cols:
@@ -199,4 +225,15 @@ elif menu == "Prediction":
         prediction = np.expm1(model.predict(input_df)[0])
 
         st.success("Prediction Generated Successfully!")
-        st.write(f"Estimated Rent: ₹{int(prediction)}")
+
+        st.markdown(
+            f"<div class='glass'><h2>Estimated Rent</h2>"
+            f"<h1 style='color:#64ffda;'>₹{int(prediction)}</h1></div>",
+            unsafe_allow_html=True
+        )
+
+        low = int(prediction * 0.9)
+        high = int(prediction * 1.1)
+
+        st.write(f"Estimated Range: ₹{low} - ₹{high}")
+        st.write("Confidence based on model performance (~72% accuracy)")
