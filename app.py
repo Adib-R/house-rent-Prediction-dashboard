@@ -26,10 +26,16 @@ df = pd.read_csv(file_path)
 # ======================
 # CLEANING
 # ======================
-df = df.dropna()
 
-# Remove outliers (top 5%)
-df = df[df["rent"] < df["rent"].quantile(0.95)]
+# Fill missing values instead of dropping
+df.fillna(df.median(numeric_only=True), inplace=True)
+
+# IQR OUTLIER REMOVAL
+Q1 = df["rent"].quantile(0.25)
+Q3 = df["rent"].quantile(0.75)
+IQR = Q3 - Q1
+
+df = df[(df["rent"] >= Q1 - 1.5 * IQR) & (df["rent"] <= Q3 + 1.5 * IQR)]
 
 # ======================
 # FEATURE ENGINEERING
@@ -51,7 +57,7 @@ def train_models(data):
     df_ml = pd.get_dummies(df_ml, drop_first=True)
 
     X = df_ml.drop("rent", axis=1)
-    y = np.log1p(df_ml["rent"])  # log transform
+    y = np.log1p(df_ml["rent"])
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
@@ -89,24 +95,12 @@ def train_models(data):
             "mae": mae
         }
 
-    # Best model selection
+    # Best model
     best_model_name = max(results, key=lambda x: results[x]["r2"])
     best_model = results[best_model_name]["model"]
 
-    # ✅ FIXED CROSS VALIDATION (same parameters)
-    cv_score = cross_val_score(
-        RandomForestRegressor(
-            n_estimators=200,
-            max_depth=15,
-            min_samples_split=5,
-            min_samples_leaf=2,
-            random_state=42
-        ),
-        X,
-        y,
-        cv=5,
-        scoring="r2"
-    ).mean()
+    # Cross-validation using BEST model
+    cv_score = cross_val_score(best_model, X, y, cv=5, scoring="r2").mean()
 
     return best_model, best_model_name, results, X.columns, X_test, y_test, cv_score
 
@@ -180,15 +174,15 @@ elif menu == "Model":
 
     st.plotly_chart(fig)
 
-    # Feature importance
-    importance = pd.DataFrame({
-        "Feature": feature_cols,
-        "Importance": model.feature_importances_
-    }).sort_values(by="Importance", ascending=False)
+    # Feature importance (safe)
+    if hasattr(model, "feature_importances_"):
+        importance = pd.DataFrame({
+            "Feature": feature_cols,
+            "Importance": model.feature_importances_
+        }).sort_values(by="Importance", ascending=False)
 
-    st.subheader("Top Features")
-    st.write("Most important factors affecting rent:")
-    st.bar_chart(importance.head(10).set_index("Feature"))
+        st.subheader("Top Features")
+        st.bar_chart(importance.head(10).set_index("Feature"))
 
 # ======================
 # PREDICTION
@@ -211,31 +205,26 @@ elif menu == "Prediction":
 
     if st.button("Predict"):
 
-        if area <= 0:
-            st.error("Area must be positive")
-        else:
-            input_df = pd.DataFrame(
-                np.zeros((1, len(feature_cols))),
-                columns=feature_cols
-            )
+        input_df = pd.DataFrame(
+            np.zeros((1, len(feature_cols))),
+            columns=feature_cols
+        )
 
-            input_df["area"] = area
-            input_df["bathrooms"] = bathrooms
-            input_df["beds"] = bedrooms
-            input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
-            input_df["room_density"] = area / (bedrooms + 1)
+        input_df["area"] = area
+        input_df["bathrooms"] = bathrooms
+        input_df["beds"] = bedrooms
+        input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
+        input_df["room_density"] = area / (bedrooms + 1)
 
-            # ✅ Improved locality logic (city-based average)
-            input_df["locality_freq"] = df[df["city"] == city]["locality_freq"].mean()
+        input_df["locality_freq"] = df[df["city"] == city]["locality_freq"].mean()
 
-            # Encoding
-            for col in feature_cols:
-                if col == f"city_{city}":
-                    input_df[col] = 1
-                elif col == f"furnishing_{furnishing}":
-                    input_df[col] = 1
+        for col in feature_cols:
+            if col == f"city_{city}":
+                input_df[col] = 1
+            elif col == f"furnishing_{furnishing}":
+                input_df[col] = 1
 
-            prediction = np.expm1(model.predict(input_df)[0])
+        prediction = np.expm1(model.predict(input_df)[0])
 
-            st.success(f"Estimated Rent: ₹{int(prediction)}")
-            st.info(f"Expected Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}")
+        st.success(f"Estimated Rent: ₹{int(prediction)}")
+        st.info(f"Expected Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}")
