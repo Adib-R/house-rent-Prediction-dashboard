@@ -35,7 +35,7 @@ df["locality_freq"] = df["locality"].map(freq)
 df = df.drop(columns=["locality"])
 
 # ======================
-# UI CSS
+# UI STYLE
 # ======================
 st.markdown("""
 <style>
@@ -63,13 +63,44 @@ st.markdown("""
 # ======================
 st.markdown("""
 <h1 style='text-align:center;'>Indian House Rent Prediction</h1>
-<p style='text-align:center;color:#64ffda;'>Optimized Random Forest Model</p>
+<p style='text-align:center;color:#64ffda;'>Random Forest Based ML Model</p>
 """, unsafe_allow_html=True)
 
 st.caption(f"{len(df)} listings | {df['city'].nunique()} cities")
 
 # ======================
-# METRICS
+# MODEL TRAINING (FIXED)
+# ======================
+@st.cache_resource
+def train_model(data):
+    df_ml = data.drop(columns=["house_type", "area_rate"])
+    df_ml = pd.get_dummies(df_ml, drop_first=True)
+
+    X = df_ml.drop("rent", axis=1)
+    y = np.log1p(df_ml["rent"])
+
+    # ✅ Proper split BEFORE training
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    model = RandomForestRegressor(
+        n_estimators=400,
+        max_depth=20,
+        min_samples_split=4,
+        min_samples_leaf=2,
+        max_features="sqrt",
+        random_state=42
+    )
+
+    model.fit(X_train, y_train)
+
+    return model, X.columns, X_test, y_test
+
+model, feature_cols, X_test, y_test = train_model(df)
+
+# ======================
+# METRICS UI
 # ======================
 col1, col2, col3 = st.columns(3)
 
@@ -81,31 +112,6 @@ col3.markdown(f"<div class='glass'><p>Max Rent</p><p class='value'>₹{int(df['r
 # SIDEBAR
 # ======================
 menu = st.sidebar.radio("Navigation", ["EDA", "Model", "Prediction"])
-
-# ======================
-# TRAIN MODEL
-# ======================
-@st.cache_resource
-def train_model(data):
-    df_ml = data.drop(columns=["house_type", "area_rate"])
-    df_ml = pd.get_dummies(df_ml, drop_first=True)
-
-    X = df_ml.drop("rent", axis=1)
-    y = np.log1p(df_ml["rent"])
-
-    model = RandomForestRegressor(
-        n_estimators=400,
-        max_depth=20,
-        min_samples_split=4,
-        min_samples_leaf=2,
-        max_features="sqrt",
-        random_state=42
-    )
-
-    model.fit(X, y)
-    return model, X.columns, X, y
-
-model, feature_cols, X_full, y_full = train_model(df)
 
 # ======================
 # EDA
@@ -133,35 +139,30 @@ if menu == "EDA":
     """)
 
 # ======================
-# MODEL
+# MODEL PERFORMANCE
 # ======================
 elif menu == "Model":
     st.subheader("🤖 Model Performance")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_full, y_full, test_size=0.2, random_state=42
-    )
-
-    model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
 
     r2 = r2_score(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    rmse_log = np.sqrt(mean_squared_error(y_test, y_pred))
     rmse_actual = np.sqrt(mean_squared_error(np.expm1(y_test), np.expm1(y_pred)))
 
     st.markdown(f"<div class='glass'><p>R² Score</p><p class='value'>{r2:.2f}</p></div>", unsafe_allow_html=True)
 
-    st.write(f"RMSE (log scale): {rmse:.2f}")
+    st.write(f"RMSE (log scale): {rmse_log:.2f}")
     st.write(f"Average Error (₹): ₹{int(rmse_actual)}")
 
     # Feature Importance
     importance = pd.DataFrame({
-        "Feature": X_full.columns,
+        "Feature": feature_cols,
         "Importance": model.feature_importances_
     }).sort_values(by="Importance", ascending=False)
 
     st.subheader("Top Influencing Features")
-    st.bar_chart(importance.head(10).set_index("Feature"), height=400)
+    st.bar_chart(importance.head(10).set_index("Feature"))
 
     st.write("Top 5 Factors:")
     st.write(importance.head(5))
@@ -171,20 +172,13 @@ Model: Random Forest Regressor
 Technique: Log Transformation + Feature Engineering  
 """)
 
-    st.caption("""
-Limitations:
-- Amenities not included  
-- Market demand not considered  
-- Locality simplified  
-""")
-
 # ======================
 # PREDICTION
 # ======================
 elif menu == "Prediction":
     st.subheader("🏠 Predict Rent")
 
-    st.info("Enter property details to estimate rent using trained ML model.")
+    st.info("Enter property details to estimate rent.")
 
     col1, col2, col3 = st.columns(3)
 
@@ -201,8 +195,8 @@ elif menu == "Prediction":
 
     if st.button("Predict Rent"):
 
-        input_df = pd.DataFrame(columns=feature_cols)
-        input_df.loc[0] = 0
+        # ✅ Robust input creation
+        input_df = pd.DataFrame(np.zeros((1, len(feature_cols))), columns=feature_cols)
 
         input_df["area"] = area
         input_df["bathrooms"] = bathrooms
@@ -217,9 +211,10 @@ elif menu == "Prediction":
             elif col == f"furnishing_{furnishing}":
                 input_df[col] = 1
 
+        # Prediction
         prediction = np.expm1(model.predict(input_df)[0])
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.success("Prediction Generated Successfully!")
 
         st.markdown(
             f"<div class='glass'><h2>Estimated Rent</h2>"
@@ -231,10 +226,9 @@ elif menu == "Prediction":
         high = int(prediction * 1.1)
 
         st.write(f"Estimated Range: ₹{low} - ₹{high}")
-        st.success("Confidence: Medium (~80% accuracy)")
         st.caption("Prediction may vary due to real-world factors.")
 
 # ======================
 # FOOTER
 # ======================
-#st.markdown("<hr><p style='text-align:center;'>Developed by Wiz</p>", unsafe_allow_html=True)
+# st.markdown("<hr><p style='text-align:center;'>Developed by Wiz</p>", unsafe_allow_html=True)
