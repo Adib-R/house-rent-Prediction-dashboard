@@ -4,81 +4,76 @@ import numpy as np
 import os
 import plotly.express as px
 import plotly.graph_objects as go
+
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
 # ======================
 # PAGE CONFIG
 # ======================
-st.set_page_config(page_title="House Rent Dashboard", layout="wide")
+st.set_page_config(page_title="🏠 House Rent Dashboard", layout="wide")
+
+# ======================
+# CSS (FIXED)
+# ======================
+st.markdown("""
+<style>
+.block-container {
+    max-width: 1100px;
+    margin: auto;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+.card {
+    background-color: #1C1F26;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+}
+h1, h2, h3 {
+    text-align: center;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ======================
 # LOAD DATA
 # ======================
-file_path = os.path.join(os.path.dirname(__file__), "data.csv")
-df = pd.read_csv(file_path)
+@st.cache_data
+def load_data():
+    return pd.read_csv("data.csv")
+
+df = load_data()
 
 # ======================
 # CLEANING
 # ======================
-df = df.dropna()
-df = df[df["rent"] < df["rent"].quantile(0.95)]
+df.fillna(df.median(numeric_only=True), inplace=True)
+
+lower = df["rent"].quantile(0.01)
+upper = df["rent"].quantile(0.99)
+df["rent"] = df["rent"].clip(lower, upper)
 
 # ======================
 # FEATURE ENGINEERING
 # ======================
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
-
-# NEW FEATURE
 df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
+df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
 
-# LOCALITY IMPROVEMENT
-freq = df["locality"].value_counts()
-df["locality"] = df["locality"].apply(lambda x: x if freq[x] > 10 else "Other")
-df["locality_freq"] = df["locality"].map(df["locality"].value_counts())
-df = df.drop(columns=["locality"])
-
-# ======================
-# STYLE
-# ======================
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(135deg, #0a192f, #112240, #1f4068);
-    color: #e6f1ff;
-}
-.glass {
-    background: rgba(255,255,255,0.06);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    padding: 20px;
-}
-.value {
-    font-size: 26px;
-    font-weight: bold;
-    color: #64ffda;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ======================
-# HEADER
-# ======================
-st.markdown("""
-<h1 style='text-align:center;'>Indian House Rent Prediction</h1>
-<p style='text-align:center;color:#64ffda;'>Optimized Random Forest Model</p>
-""", unsafe_allow_html=True)
-
-st.caption(f"{len(df)} listings | {df['city'].nunique()} cities")
+df["locality_target"] = df.groupby("locality")["rent"].transform("mean")
 
 # ======================
 # MODEL
 # ======================
 @st.cache_resource
-def train_model(data):
-    df_ml = data.drop(columns=["house_type", "area_rate"])
+def train_models(data):
+    df_ml = data.drop(columns=["house_type", "area_rate", "locality"])
     df_ml = pd.get_dummies(df_ml, drop_first=True)
 
     X = df_ml.drop("rent", axis=1)
@@ -88,40 +83,75 @@ def train_model(data):
         X, y, test_size=0.2, random_state=42
     )
 
-    model = RandomForestRegressor(
-        n_estimators=600,
-        max_depth=25,
-        min_samples_split=4,
-        min_samples_leaf=2,
-        max_features="sqrt",
-        random_state=42
-    )
+    models = {
+        "Linear Regression": LinearRegression(),
+        "Decision Tree": DecisionTreeRegressor(max_depth=12, random_state=42),
+        "Random Forest": RandomForestRegressor(
+            n_estimators=400,
+            max_depth=20,
+            random_state=42,
+            n_jobs=-1
+        )
+    }
 
-    model.fit(X_train, y_train)
+    results = {}
 
-    return model, X.columns, X_test, y_test
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        pred = model.predict(X_test)
 
-model, feature_cols, X_test, y_test = train_model(df)
+        actual = np.expm1(y_test)
+        predicted = np.expm1(pred)
+
+        results[name] = {
+            "model": model,
+            "r2": r2_score(actual, predicted),
+            "rmse": np.sqrt(mean_squared_error(actual, predicted)),
+            "mae": mean_absolute_error(actual, predicted)
+        }
+
+    best_model_name = "Random Forest"
+    best_model = results["Random Forest"]["model"]
+
+    cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
+
+    return best_model, best_model_name, results, X.columns, X_test, y_test, cv_score
+
+
+model, best_model_name, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
 # ======================
-# METRICS
+# HEADER
 # ======================
+st.markdown("""
+<h1>🏠 Indian House Rent Prediction</h1>
+<h3 style='color:#00FFAA;'>Smart ML-Based Rent Estimation System</h3>
+""", unsafe_allow_html=True)
+
+# KPI CARDS
 col1, col2, col3 = st.columns(3)
 
-col1.markdown(f"<div class='glass'><p>Total Listings</p><p class='value'>{len(df)}</p></div>", unsafe_allow_html=True)
-col2.markdown(f"<div class='glass'><p>Average Rent</p><p class='value'>₹{int(df['rent'].mean())}</p></div>", unsafe_allow_html=True)
-col3.markdown(f"<div class='glass'><p>Max Rent</p><p class='value'>₹{int(df['rent'].max())}</p></div>", unsafe_allow_html=True)
+with col1:
+    st.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"<div class='card'><h4>Cities</h4><h2>{df['city'].nunique()}</h2></div>", unsafe_allow_html=True)
+
+with col3:
+    st.markdown(f"<div class='card'><h4>Average Rent</h4><h2>₹{int(df['rent'].mean())}</h2></div>", unsafe_allow_html=True)
+
+st.markdown("---")
 
 # ======================
 # SIDEBAR
 # ======================
-menu = st.sidebar.radio("Navigation", ["EDA", "Model", "Prediction"])
+menu = st.sidebar.radio("📂 Navigation", ["📊 EDA", "🤖 Model", "🏠 Prediction"])
 
 # ======================
 # EDA
 # ======================
-if menu == "EDA":
-    st.subheader("📊 Data Insights")
+if menu == "📊 EDA":
+    st.markdown("## 📊 Exploratory Data Analysis")
 
     col1, col2 = st.columns(2)
 
@@ -134,48 +164,35 @@ if menu == "EDA":
         fig = px.bar(city_avg, x="city", y="rent")
         st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Key Insights")
-    st.markdown("""
-    - 📍 Mumbai has highest rent  
-    - 🛁 Bathrooms strongly affect rent  
-    - 📐 Area increases rent significantly  
-    - 🏙 Location plays major role  
-    """)
+# ======================
+# MODEL
+# ======================
+elif menu == "🤖 Model":
+    st.markdown("## 🤖 Model Performance")
 
-# ======================
-# MODEL PERFORMANCE
-# ======================
-elif menu == "Model":
-    st.subheader("🤖 Model Performance")
+    result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
+    result_df.columns = ["R² Score", "RMSE", "MAE"]
+
+    st.dataframe(result_df)
+    st.success("✔ Final Model: Random Forest")
+    st.info(f"Cross Validation Score: {cv_score:.2f}")
 
     y_pred = model.predict(X_test)
-
-    r2 = r2_score(y_test, y_pred)
-    rmse_actual = np.sqrt(mean_squared_error(np.expm1(y_test), np.expm1(y_pred)))
-
-    st.markdown(f"<div class='glass'><p>R² Score</p><p class='value'>{r2:.2f}</p></div>", unsafe_allow_html=True)
-    st.write(f"Average Error (₹): ₹{int(rmse_actual)}")
-
-    # Prediction vs Actual Graph
     actual = np.expm1(y_test)
     predicted = np.expm1(y_pred)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers', name='Predicted'))
-    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines', name='Perfect Prediction'))
-    fig.update_layout(title="Actual vs Predicted Rent",
-                      xaxis_title="Actual Rent",
-                      yaxis_title="Predicted Rent")
-
+    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers'))
+    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines'))
     st.plotly_chart(fig)
 
 # ======================
 # PREDICTION
 # ======================
-elif menu == "Prediction":
-    st.subheader("🏠 Predict Rent")
+elif menu == "🏠 Prediction":
+    st.markdown("## 🏠 Predict House Rent")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
 
     with col1:
         area = st.number_input("Area", 300, 5000, 1000)
@@ -183,13 +200,11 @@ elif menu == "Prediction":
 
     with col2:
         bathrooms = st.slider("Bathrooms", 1, 5, 2)
-        furnishing = st.selectbox("Furnishing", df["furnishing"].unique())
-
-    with col3:
         bedrooms = st.slider("Bedrooms", 1, 5, 2)
 
-    if st.button("Predict Rent"):
+    furnishing = st.selectbox("Furnishing", df["furnishing"].unique())
 
+    if st.button("Predict"):
         input_df = pd.DataFrame(np.zeros((1, len(feature_cols))), columns=feature_cols)
 
         input_df["area"] = area
@@ -198,7 +213,8 @@ elif menu == "Prediction":
         input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
         input_df["room_density"] = area / (bedrooms + 1)
         input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
-        input_df["locality_freq"] = df["locality_freq"].mean()
+        input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
+        input_df["locality_target"] = df["locality_target"].mean()
 
         for col in feature_cols:
             if col == f"city_{city}":
@@ -208,16 +224,17 @@ elif menu == "Prediction":
 
         prediction = np.expm1(model.predict(input_df)[0])
 
-        st.success("Prediction Generated Successfully!")
+        st.markdown(f"""
+        <div style="display:flex;justify-content:center;">
+        <div style="background:#1C1F26;padding:25px;border-radius:12px;width:300px;text-align:center;">
+        <h2 style="color:#00FFAA;">₹{int(prediction)}</h2>
+        <p>Estimated Rent</p>
+        </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.markdown(
-            f"<div class='glass'><h2>Estimated Rent</h2>"
-            f"<h1 style='color:#64ffda;'>₹{int(prediction)}</h1></div>",
-            unsafe_allow_html=True
-        )
-
-        low = int(prediction * 0.9)
-        high = int(prediction * 1.1)
-
-        st.write(f"Estimated Range: ₹{low} - ₹{high}")
-        st.caption("Confidence based on model performance (~72% accuracy)")
+# ======================
+# FOOTER
+# ======================
+st.markdown("---")
+st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project</p>", unsafe_allow_html=True)
