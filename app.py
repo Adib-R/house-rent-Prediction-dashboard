@@ -115,7 +115,7 @@ model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 # HEADER
 
 st.markdown("""
-<h1>House Rent Prediction System</h1>
+<h1>Indian House Rent Prediction System</h1>
 <h3 style='color:#00FFAA;'>Machine Learning-Based Rental Price Estimation</h3>
 """, unsafe_allow_html=True)
 
