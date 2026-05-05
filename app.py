@@ -5,7 +5,7 @@ import os
 import plotly.express as px
 import plotly.graph_objects as go
 
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 
@@ -28,7 +28,7 @@ df = pd.read_csv(file_path)
 # ======================
 df.fillna(df.median(numeric_only=True), inplace=True)
 
-# CLIP OUTLIERS (better than removing)
+# Clip outliers
 lower = df["rent"].quantile(0.01)
 upper = df["rent"].quantile(0.99)
 df["rent"] = df["rent"].clip(lower, upper)
@@ -38,12 +38,10 @@ df["rent"] = df["rent"].clip(lower, upper)
 # ======================
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
-
-# NEW FEATURES 🔥
 df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
 df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
 
-# TARGET ENCODING (IMPORTANT)
+# Target encoding
 locality_mean = df.groupby("locality")["rent"].mean()
 df["locality_target"] = df["locality"].map(locality_mean)
 
@@ -65,13 +63,7 @@ def train_models(data):
 
     models = {
         "Linear Regression": LinearRegression(),
-
-        "Decision Tree": DecisionTreeRegressor(
-            max_depth=12,
-            random_state=42
-        ),
-
-        # 🔥 IMPROVED RANDOM FOREST
+        "Decision Tree": DecisionTreeRegressor(max_depth=12, random_state=42),
         "Random Forest": RandomForestRegressor(
             n_estimators=400,
             max_depth=20,
@@ -80,14 +72,6 @@ def train_models(data):
             max_features="sqrt",
             random_state=42,
             n_jobs=-1
-        ),
-
-        # 🔥 NEW MODEL (VERY IMPORTANT)
-        "Gradient Boosting": GradientBoostingRegressor(
-            n_estimators=300,
-            learning_rate=0.05,
-            max_depth=4,
-            random_state=42
         )
     }
 
@@ -111,9 +95,9 @@ def train_models(data):
             "mae": mae
         }
 
-    # Best model selection
-    best_model_name = max(results, key=lambda x: results[x]["r2"])
-    best_model = results[best_model_name]["model"]
+    # 🔥 Force Random Forest as final model
+    best_model_name = "Random Forest"
+    best_model = results["Random Forest"]["model"]
 
     # Cross-validation
     cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
@@ -162,7 +146,7 @@ elif menu == "Model":
 
     st.dataframe(result_df)
 
-    st.success(f"Best Model: {best_model_name}")
+    st.success(f"Final Model Used: {best_model_name}")
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
     y_pred = model.predict(X_test)
@@ -182,6 +166,7 @@ elif menu == "Model":
 
     st.plotly_chart(fig)
 
+    # Feature importance
     if hasattr(model, "feature_importances_"):
         importance = pd.DataFrame({
             "Feature": feature_cols,
