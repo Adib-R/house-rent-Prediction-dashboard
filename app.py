@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -18,7 +17,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 st.set_page_config(page_title="🏠 House Rent Dashboard", layout="wide")
 
 # ======================
-# CSS (FIXED)
+# CSS (FINAL UI FIX)
 # ======================
 st.markdown("""
 <style>
@@ -26,7 +25,6 @@ st.markdown("""
     max-width: 1100px;
     margin: auto;
     padding-top: 2rem;
-    padding-bottom: 2rem;
 }
 .card {
     background-color: #1C1F26;
@@ -53,10 +51,7 @@ df = load_data()
 # CLEANING
 # ======================
 df.fillna(df.median(numeric_only=True), inplace=True)
-
-lower = df["rent"].quantile(0.01)
-upper = df["rent"].quantile(0.99)
-df["rent"] = df["rent"].clip(lower, upper)
+df["rent"] = df["rent"].clip(df["rent"].quantile(0.01), df["rent"].quantile(0.99))
 
 # ======================
 # FEATURE ENGINEERING
@@ -73,6 +68,7 @@ df["locality_target"] = df.groupby("locality")["rent"].transform("mean")
 # ======================
 @st.cache_resource
 def train_models(data):
+
     df_ml = data.drop(columns=["house_type", "area_rate", "locality"])
     df_ml = pd.get_dummies(df_ml, drop_first=True)
 
@@ -110,15 +106,13 @@ def train_models(data):
             "mae": mean_absolute_error(actual, predicted)
         }
 
-    best_model_name = "Random Forest"
     best_model = results["Random Forest"]["model"]
-
     cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
 
-    return best_model, best_model_name, results, X.columns, X_test, y_test, cv_score
+    return best_model, results, X.columns, X_test, y_test, cv_score
 
 
-model, best_model_name, results, feature_cols, X_test, y_test, cv_score = train_models(df)
+model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
 # ======================
 # HEADER
@@ -131,14 +125,9 @@ st.markdown("""
 # KPI CARDS
 col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
-
-with col2:
-    st.markdown(f"<div class='card'><h4>Cities</h4><h2>{df['city'].nunique()}</h2></div>", unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"<div class='card'><h4>Average Rent</h4><h2>₹{int(df['rent'].mean())}</h2></div>", unsafe_allow_html=True)
+col1.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
+col2.markdown(f"<div class='card'><h4>Cities</h4><h2>{df['city'].nunique()}</h2></div>", unsafe_allow_html=True)
+col3.markdown(f"<div class='card'><h4>Average Rent</h4><h2>₹{int(df['rent'].mean())}</h2></div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -174,17 +163,39 @@ elif menu == "🤖 Model":
     result_df.columns = ["R² Score", "RMSE", "MAE"]
 
     st.dataframe(result_df)
+
     st.success("✔ Final Model: Random Forest")
     st.info(f"Cross Validation Score: {cv_score:.2f}")
 
+    # 📊 1. Model Comparison
+    st.markdown("### 📊 Model Comparison")
+    fig = px.bar(result_df, barmode="group")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 📉 2. Actual vs Predicted
+    st.markdown("### 📈 Actual vs Predicted")
     y_pred = model.predict(X_test)
+
     actual = np.expm1(y_test)
     predicted = np.expm1(y_pred)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers'))
-    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines'))
-    st.plotly_chart(fig)
+    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers', name="Predicted"))
+    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines', name="Perfect Fit"))
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ⭐ 3. Feature Importance
+    if hasattr(model, "feature_importances_"):
+        st.markdown("### ⭐ Feature Importance")
+
+        feat_df = pd.DataFrame({
+            "Feature": feature_cols,
+            "Importance": model.feature_importances_
+        }).sort_values(by="Importance", ascending=False).head(10)
+
+        fig = px.bar(feat_df, x="Importance", y="Feature", orientation='h')
+        st.plotly_chart(fig, use_container_width=True)
 
 # ======================
 # PREDICTION
@@ -237,4 +248,4 @@ elif menu == "🏠 Prediction":
 # FOOTER
 # ======================
 st.markdown("---")
-st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project | House Rent Prediction</p>", unsafe_allow_html=True)
