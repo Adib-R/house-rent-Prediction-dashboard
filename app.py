@@ -17,7 +17,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 st.set_page_config(page_title="🏠 House Rent Dashboard", layout="wide")
 
 # ======================
-# CSS (FINAL UI FIX)
+# CSS
 # ======================
 st.markdown("""
 <style>
@@ -122,7 +122,7 @@ st.markdown("""
 <h3 style='color:#00FFAA;'>Smart ML-Based Rent Estimation System</h3>
 """, unsafe_allow_html=True)
 
-# KPI CARDS
+# KPI
 col1, col2, col3 = st.columns(3)
 
 col1.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -145,18 +145,17 @@ if menu == "📊 EDA":
     col1, col2 = st.columns(2)
 
     with col1:
-        fig = px.histogram(df, x="rent")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(px.histogram(df, x="rent"), use_container_width=True)
 
     with col2:
         city_avg = df.groupby("city")["rent"].mean().reset_index()
-        fig = px.bar(city_avg, x="city", y="rent")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(px.bar(city_avg, x="city", y="rent"), use_container_width=True)
 
 # ======================
 # MODEL
 # ======================
 elif menu == "🤖 Model":
+
     st.markdown("## 🤖 Model Performance")
 
     result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
@@ -167,13 +166,37 @@ elif menu == "🤖 Model":
     st.success("✔ Final Model: Random Forest")
     st.info(f"Cross Validation Score: {cv_score:.2f}")
 
-    # 📊 1. Model Comparison
-    st.markdown("### 📊 Model Comparison")
-    fig = px.bar(result_df, barmode="group")
+    # -------------------
+    # R2 GRAPH
+    # -------------------
+    st.markdown("### 📊 R² Score Comparison")
+
+    r2_df = result_df["R² Score"].reset_index()
+    r2_df.columns = ["Model", "R² Score"]
+
+    fig = px.bar(r2_df, x="Model", y="R² Score", color="Model", text_auto=True)
+    fig.update_layout(yaxis_range=[0,1])
+
     st.plotly_chart(fig, use_container_width=True)
 
-    # 📉 2. Actual vs Predicted
+    # -------------------
+    # ERROR GRAPH
+    # -------------------
+    st.markdown("### 📉 Error Comparison")
+
+    error_df = result_df[["RMSE", "MAE"]].reset_index()
+    error_df = error_df.melt(id_vars="index", var_name="Metric", value_name="Value")
+    error_df.rename(columns={"index": "Model"}, inplace=True)
+
+    fig = px.bar(error_df, x="Model", y="Value", color="Metric", barmode="group")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # -------------------
+    # ACTUAL VS PREDICTED
+    # -------------------
     st.markdown("### 📈 Actual vs Predicted")
+
     y_pred = model.predict(X_test)
 
     actual = np.expm1(y_test)
@@ -185,7 +208,9 @@ elif menu == "🤖 Model":
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ⭐ 3. Feature Importance
+    # -------------------
+    # FEATURE IMPORTANCE
+    # -------------------
     if hasattr(model, "feature_importances_"):
         st.markdown("### ⭐ Feature Importance")
 
@@ -195,12 +220,14 @@ elif menu == "🤖 Model":
         }).sort_values(by="Importance", ascending=False).head(10)
 
         fig = px.bar(feat_df, x="Importance", y="Feature", orientation='h')
+
         st.plotly_chart(fig, use_container_width=True)
 
 # ======================
 # PREDICTION
 # ======================
 elif menu == "🏠 Prediction":
+
     st.markdown("## 🏠 Predict House Rent")
 
     col1, col2 = st.columns(2)
@@ -216,6 +243,7 @@ elif menu == "🏠 Prediction":
     furnishing = st.selectbox("Furnishing", df["furnishing"].unique())
 
     if st.button("Predict"):
+
         input_df = pd.DataFrame(np.zeros((1, len(feature_cols))), columns=feature_cols)
 
         input_df["area"] = area
