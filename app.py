@@ -14,7 +14,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 # ======================
 # PAGE CONFIG
 # ======================
-st.set_page_config(page_title="House Rent Prediction Dashboard", layout="wide")
+st.set_page_config(page_title="Indian House Rent Prediction Dashboard", layout="wide")
 
 # ======================
 # CUSTOM CSS (RESPONSIVE)
@@ -275,6 +275,6 @@ elif menu == "Rent Prediction":
 # ======================
 st.markdown("---")
 st.markdown(
-    "<p style='text-align:center;color:gray;'>Academic Project (PT-2) | House Rent Prediction System</p>",
+    "<p style='text-align:center;color:gray;'>Academic Project (PT-2) | Indian House Rent Prediction System</p>",
     unsafe_allow_html=True
 )
