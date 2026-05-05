@@ -18,25 +18,19 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 st.set_page_config(page_title="🏠 House Rent Dashboard", layout="wide")
 
 # ======================
-# CSS (RESPONSIVE FIX)
+# CSS (FIXED RESPONSIVE)
 # ======================
 st.markdown("""
 <style>
 .block-container {
-    max-width: 1100px;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+    max-width: 100%;
+    padding: 1rem 2rem;
 }
 .card {
     background-color: #1C1F26;
     padding: 20px;
     border-radius: 12px;
     text-align: center;
-}
-@media (max-width: 768px) {
-    .card {
-        margin-bottom: 15px;
-    }
 }
 h1, h2, h3 {
     text-align: center;
@@ -45,10 +39,15 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 # ======================
-# LOAD DATA
+# LOAD DATA (CACHED)
 # ======================
 file_path = os.path.join(os.path.dirname(__file__), "data.csv")
-df = pd.read_csv(file_path)
+
+@st.cache_data
+def load_data():
+    return pd.read_csv(file_path)
+
+df = load_data()
 
 # ======================
 # CLEANING
@@ -115,14 +114,17 @@ def train_models(data):
             "mae": mean_absolute_error(actual, predicted)
         }
 
-    best_model = results["Random Forest"]["model"]
+    # ✅ BEST MODEL SELECTION
+    best_model_name = max(results, key=lambda x: results[x]["r2"])
+    best_model = results[best_model_name]["model"]
+
     cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
 
-    return best_model, results, X.columns, X_test, y_test, cv_score
+    return best_model, best_model_name, results, X.columns, X_test, y_test, cv_score
 
 
 with st.spinner("Training model..."):
-    model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
+    model, best_model_name, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
 # ======================
 # HEADER
@@ -133,7 +135,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # KPI CARDS
-col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns([1,1,1], gap="large")
 
 with col1:
     st.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -162,13 +164,13 @@ if menu == "📊 EDA":
 
     with col1:
         st.markdown("#### Rent Distribution")
-        fig = px.histogram(df, x="rent")
+        fig = px.histogram(df, x="rent", color_discrete_sequence=["#00FFAA"])
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
         st.markdown("#### Average Rent by City")
         city_avg = df.groupby("city")["rent"].mean().reset_index()
-        fig = px.bar(city_avg, x="city", y="rent")
+        fig = px.bar(city_avg, x="city", y="rent", color_discrete_sequence=["#00FFAA"])
         st.plotly_chart(fig, use_container_width=True)
 
 # ======================
@@ -179,13 +181,18 @@ elif menu == "🤖 Model":
 
     result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
     result_df.columns = ["R² Score", "RMSE", "MAE"]
+
     st.dataframe(result_df)
 
-    st.success("✔ Final Model: Random Forest")
+    st.success(f"✔ Final Model: {best_model_name}")
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
-    y_pred = model.predict(X_test)
+    # 📊 Comparison Chart
+    fig = px.bar(result_df, barmode="group")
+    st.plotly_chart(fig)
 
+    # 📉 Actual vs Predicted
+    y_pred = model.predict(X_test)
     actual = np.expm1(y_test)
     predicted = np.expm1(y_pred)
 
@@ -195,6 +202,15 @@ elif menu == "🤖 Model":
 
     fig.update_layout(title="Actual vs Predicted Rent")
     st.plotly_chart(fig)
+
+    # ⭐ Feature Importance
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+        feat_df = pd.DataFrame({"Feature": feature_cols, "Importance": importances})
+        feat_df = feat_df.sort_values(by="Importance", ascending=False).head(10)
+
+        fig = px.bar(feat_df, x="Importance", y="Feature", orientation='h')
+        st.plotly_chart(fig)
 
 # ======================
 # PREDICTION
@@ -227,7 +243,9 @@ elif menu == "🏠 Prediction":
         input_df["room_density"] = area / (bedrooms + 1)
         input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
         input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
-        input_df["locality_target"] = df[df["city"] == city]["locality_target"].mean()
+
+        # ✅ safer locality encoding
+        input_df["locality_target"] = df["locality_target"].mean()
 
         for col in feature_cols:
             if col == f"city_{city}":
