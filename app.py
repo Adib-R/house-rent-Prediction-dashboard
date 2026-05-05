@@ -11,14 +11,12 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
-# ======================
 # PAGE CONFIG
-# ======================
+
 st.set_page_config(page_title="Indian House Rent Prediction Dashboard", layout="wide")
 
-# ======================
 # CUSTOM CSS (RESPONSIVE)
-# ======================
+
 st.markdown("""
 <style>
 .block-container {
@@ -43,33 +41,29 @@ h1, h2, h3 {
 </style>
 """, unsafe_allow_html=True)
 
-# ======================
 # LOAD DATA
-# ======================
+
 @st.cache_data
 def load_data():
     return pd.read_csv("data.csv")
 
 df = load_data()
 
-# ======================
 # DATA CLEANING
-# ======================
+
 df.fillna(df.median(numeric_only=True), inplace=True)
 df["rent"] = df["rent"].clip(df["rent"].quantile(0.01), df["rent"].quantile(0.99))
 
-# ======================
 # FEATURE ENGINEERING
-# ======================
+
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
 df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
 df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
 df["locality_target"] = df.groupby("locality")["rent"].transform("mean")
 
-# ======================
 # MODEL TRAINING
-# ======================
+
 @st.cache_resource
 def train_models(data):
 
@@ -118,17 +112,15 @@ def train_models(data):
 
 model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
-# ======================
 # HEADER
-# ======================
+
 st.markdown("""
 <h1>House Rent Prediction System</h1>
 <h3 style='color:#00FFAA;'>Machine Learning-Based Rental Price Estimation</h3>
 """, unsafe_allow_html=True)
 
-# ======================
 # KPI SECTION
-# ======================
+
 col1, col2, col3 = st.columns(3)
 
 col1.markdown(f"<div class='card'><h4>Total Property Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -137,17 +129,15 @@ col3.markdown(f"<div class='card'><h4>Average Rental Price</h4><h2>₹{int(df['r
 
 st.markdown("---")
 
-# ======================
 # SIDEBAR NAVIGATION
-# ======================
+
 menu = st.sidebar.radio(
     "Navigation Menu",
     ["Exploratory Data Analysis", "Model Evaluation", "Rent Prediction"]
 )
 
-# ======================
 # EDA SECTION
-# ======================
+
 if menu == "Exploratory Data Analysis":
 
     st.markdown("## Exploratory Data Analysis")
@@ -163,9 +153,7 @@ if menu == "Exploratory Data Analysis":
         city_avg = df.groupby("city")["rent"].mean().reset_index()
         st.plotly_chart(px.bar(city_avg, x="city", y="rent"), use_container_width=True)
 
-# ======================
 # MODEL SECTION
-# ======================
 elif menu == "Model Evaluation":
 
     st.markdown("## Model Performance Analysis")
@@ -221,9 +209,7 @@ elif menu == "Model Evaluation":
         fig = px.bar(feat_df, x="Importance", y="Feature", orientation='h')
         st.plotly_chart(fig, use_container_width=True)
 
-# ======================
 # PREDICTION SECTION
-# ======================
 elif menu == "Rent Prediction":
 
     st.markdown("## Predict Monthly House Rent")
@@ -270,9 +256,7 @@ elif menu == "Rent Prediction":
         </div>
         """, unsafe_allow_html=True)
 
-# ======================
 # FOOTER
-# ======================
 st.markdown("---")
 st.markdown(
     "<p style='text-align:center;color:gray;'>Academic Project (PT-2) | Indian House Rent Prediction System</p>",
