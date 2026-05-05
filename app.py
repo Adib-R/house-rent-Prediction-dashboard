@@ -95,6 +95,7 @@ def train_models(data):
             "mae": mae
         }
 
+    # Force Random Forest as final model
     best_model_name = "Random Forest"
     best_model = results["Random Forest"]["model"]
 
@@ -107,16 +108,36 @@ with st.spinner("Training model..."):
     model, best_model_name, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
 # ======================
-# HEADER
+# HEADER (Premium)
 # ======================
-st.title("🏠 Indian House Rent Prediction")
-st.markdown("### 📊 Smart ML-based Rent Estimation System")
+st.markdown("""
+# 🏠 Indian House Rent Prediction
+### <span style='color:#00FFAA;'>Smart ML-Based Rent Estimation System</span>
+""", unsafe_allow_html=True)
 
-# KPI CARDS
+# KPI Cards
 col1, col2, col3 = st.columns(3)
-col1.metric("Total Listings", len(df))
-col2.metric("Cities", df["city"].nunique())
-col3.metric("Avg Rent", f"₹{int(df['rent'].mean())}")
+
+col1.markdown(f"""
+<div style="background-color:#1C1F26;padding:20px;border-radius:10px;text-align:center">
+<h3>Total Listings</h3>
+<h2>{len(df)}</h2>
+</div>
+""", unsafe_allow_html=True)
+
+col2.markdown(f"""
+<div style="background-color:#1C1F26;padding:20px;border-radius:10px;text-align:center">
+<h3>Cities</h3>
+<h2>{df['city'].nunique()}</h2>
+</div>
+""", unsafe_allow_html=True)
+
+col3.markdown(f"""
+<div style="background-color:#1C1F26;padding:20px;border-radius:10px;text-align:center">
+<h3>Average Rent</h3>
+<h2>₹{int(df['rent'].mean())}</h2>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -126,30 +147,20 @@ st.markdown("---")
 st.sidebar.subheader("📂 Navigation")
 menu = st.sidebar.radio("", ["📊 EDA", "🤖 Model", "🏠 Prediction"])
 
-# FILTERS
-st.sidebar.subheader("🔍 Filters")
-selected_city = st.sidebar.multiselect(
-    "Select City",
-    df["city"].unique(),
-    default=df["city"].unique()
-)
-
-filtered_df = df[df["city"].isin(selected_city)]
-
 # ======================
 # EDA
 # ======================
 if menu == "📊 EDA":
-    st.subheader("📊 Exploratory Data Analysis")
+    st.markdown("## 📊 Exploratory Data Analysis")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        fig = px.histogram(filtered_df, x="rent", title="Rent Distribution")
+        fig = px.histogram(df, x="rent", title="Rent Distribution")
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
-        city_avg = filtered_df.groupby("city")["rent"].mean().reset_index()
+        city_avg = df.groupby("city")["rent"].mean().reset_index()
         fig = px.bar(city_avg, x="city", y="rent", title="Average Rent by City")
         st.plotly_chart(fig, use_container_width=True)
 
@@ -157,14 +168,19 @@ if menu == "📊 EDA":
 # MODEL
 # ======================
 elif menu == "🤖 Model":
-    st.subheader("🤖 Model Performance")
+    st.markdown("## 🤖 Model Performance")
 
     result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
     result_df.columns = ["R² Score", "RMSE", "MAE"]
 
     st.dataframe(result_df)
 
-    st.success(f"Final Model Used: {best_model_name}")
+    st.markdown(f"""
+    <div style="background-color:#0E4429;padding:15px;border-radius:10px">
+    <h3>✔ Final Model: {best_model_name}</h3>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
     y_pred = model.predict(X_test)
@@ -184,28 +200,20 @@ elif menu == "🤖 Model":
 
     st.plotly_chart(fig)
 
-    # Feature importance
     if hasattr(model, "feature_importances_"):
         importance = pd.DataFrame({
             "Feature": feature_cols,
             "Importance": model.feature_importances_
         }).sort_values(by="Importance", ascending=False)
 
-        st.subheader("🔍 Top Influencing Features")
+        st.markdown("### 🔍 Top Influencing Features")
         st.bar_chart(importance.head(10).set_index("Feature"))
-
-        st.info("""
-        Key factors affecting rent:
-        - Location (most important)
-        - Area of property
-        - Number of bathrooms
-        """)
 
 # ======================
 # PREDICTION
 # ======================
 elif menu == "🏠 Prediction":
-    st.subheader("🏠 Predict House Rent")
+    st.markdown("## 🏠 Predict House Rent")
     st.markdown("### Enter Property Details")
 
     col1, col2, col3 = st.columns(3)
@@ -225,38 +233,52 @@ elif menu == "🏠 Prediction":
 
     if st.button("Predict Rent"):
 
-        if area <= 0:
-            st.error("Area must be greater than 0")
-        else:
-            input_df = pd.DataFrame(
-                np.zeros((1, len(feature_cols))),
-                columns=feature_cols
-            )
+        input_df = pd.DataFrame(
+            np.zeros((1, len(feature_cols))),
+            columns=feature_cols
+        )
 
-            input_df["area"] = area
-            input_df["bathrooms"] = bathrooms
-            input_df["beds"] = bedrooms
-            input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
-            input_df["room_density"] = area / (bedrooms + 1)
-            input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
-            input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
+        input_df["area"] = area
+        input_df["bathrooms"] = bathrooms
+        input_df["beds"] = bedrooms
+        input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
+        input_df["room_density"] = area / (bedrooms + 1)
+        input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
+        input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
 
-            input_df["locality_target"] = df[df["city"] == city]["locality_target"].mean()
+        input_df["locality_target"] = df[df["city"] == city]["locality_target"].mean()
 
-            for col in feature_cols:
-                if col == f"city_{city}":
-                    input_df[col] = 1
-                elif col == f"furnishing_{furnishing}":
-                    input_df[col] = 1
+        for col in feature_cols:
+            if col == f"city_{city}":
+                input_df[col] = 1
+            elif col == f"furnishing_{furnishing}":
+                input_df[col] = 1
 
-            prediction = np.expm1(model.predict(input_df)[0])
+        prediction = np.expm1(model.predict(input_df)[0])
 
-            st.markdown(f"## 💰 Estimated Rent: ₹{int(prediction)}")
-            st.success("✔ Prediction based on similar properties")
-            st.info(f"Expected Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}")
+        st.markdown("### 📌 Prediction Result")
+
+        st.markdown(f"""
+        <div style="background-color:#1C1F26;padding:25px;border-radius:12px;text-align:center">
+        <h2 style="color:#00FFAA;">₹{int(prediction)}</h2>
+        <p>Estimated Monthly Rent</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div style="background-color:#16213E;padding:15px;border-radius:10px;text-align:center">
+        <p>Expected Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.caption("Prediction is based on historical housing data.")
 
 # ======================
 # FOOTER
 # ======================
 st.markdown("---")
-st.markdown("Developed for PT-2 Project | Indian House Rent Prediction")
+st.markdown("""
+<div style="text-align:center;color:gray">
+Developed for PT-2 Project | Indian House Rent Prediction
+</div>
+""", unsafe_allow_html=True)
