@@ -37,12 +37,12 @@ df = df[df["rent"] < df["rent"].quantile(0.95)]
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
 
-# Frequency encoding for locality
+# Frequency encoding
 freq = df["locality"].value_counts()
 df["locality_freq"] = df["locality"].map(freq)
 
 # ======================
-# MODEL TRAINING FUNCTION
+# MODEL TRAINING
 # ======================
 @st.cache_resource
 def train_models(data):
@@ -53,12 +53,10 @@ def train_models(data):
     X = df_ml.drop("rent", axis=1)
     y = np.log1p(df_ml["rent"])  # log transform
 
-    # Split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
 
-    # MODELS
     models = {
         "Linear Regression": LinearRegression(),
         "Decision Tree": DecisionTreeRegressor(max_depth=10, random_state=42),
@@ -77,7 +75,6 @@ def train_models(data):
         model.fit(X_train, y_train)
         pred = model.predict(X_test)
 
-        # Convert back to original scale
         actual = np.expm1(y_test)
         predicted = np.expm1(pred)
 
@@ -92,13 +89,19 @@ def train_models(data):
             "mae": mae
         }
 
-    # Select BEST MODEL automatically
+    # Best model selection
     best_model_name = max(results, key=lambda x: results[x]["r2"])
     best_model = results[best_model_name]["model"]
 
-    # Cross-validation (clean)
+    # ✅ FIXED CROSS VALIDATION (same parameters)
     cv_score = cross_val_score(
-        RandomForestRegressor(random_state=42),
+        RandomForestRegressor(
+            n_estimators=200,
+            max_depth=15,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            random_state=42
+        ),
         X,
         y,
         cv=5,
@@ -140,24 +143,26 @@ if menu == "EDA":
 
     st.markdown("""
     ### Key Insights
-    - Higher area increases rent  
-    - Bathrooms significantly influence rent  
-    - Cities show large rent variation  
+    - Area significantly affects rent  
+    - Bathrooms increase rent value  
+    - Location and city influence pricing  
     """)
 
 # ======================
-# MODEL PERFORMANCE
+# MODEL
 # ======================
 elif menu == "Model":
     st.subheader("🤖 Model Comparison")
 
     result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
+    result_df.columns = ["R² Score", "RMSE", "MAE"]
+
     st.dataframe(result_df)
 
     st.success(f"Best Model: {best_model_name}")
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
-    # Prediction graph
+    # Graph
     y_pred = model.predict(X_test)
 
     actual = np.expm1(y_test)
@@ -169,8 +174,8 @@ elif menu == "Model":
 
     fig.update_layout(
         title="Actual vs Predicted Rent",
-        xaxis_title="Actual",
-        yaxis_title="Predicted"
+        xaxis_title="Actual Rent",
+        yaxis_title="Predicted Rent"
     )
 
     st.plotly_chart(fig)
@@ -182,6 +187,7 @@ elif menu == "Model":
     }).sort_values(by="Importance", ascending=False)
 
     st.subheader("Top Features")
+    st.write("Most important factors affecting rent:")
     st.bar_chart(importance.head(10).set_index("Feature"))
 
 # ======================
@@ -218,7 +224,9 @@ elif menu == "Prediction":
             input_df["beds"] = bedrooms
             input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
             input_df["room_density"] = area / (bedrooms + 1)
-            input_df["locality_freq"] = df["locality_freq"].mean()
+
+            # ✅ Improved locality logic (city-based average)
+            input_df["locality_freq"] = df[df["city"] == city]["locality_freq"].mean()
 
             # Encoding
             for col in feature_cols:
@@ -230,5 +238,4 @@ elif menu == "Prediction":
             prediction = np.expm1(model.predict(input_df)[0])
 
             st.success(f"Estimated Rent: ₹{int(prediction)}")
-
-            st.write(f"Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}")
+            st.info(f"Expected Range: ₹{int(prediction*0.9)} - ₹{int(prediction*1.1)}")
