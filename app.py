@@ -18,20 +18,31 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 st.set_page_config(page_title="🏠 House Rent Dashboard", layout="wide")
 
 # ======================
-# CSS (FIXED RESPONSIVE)
+# CSS (FINAL RESPONSIVE FIX)
 # ======================
 st.markdown("""
 <style>
 .block-container {
-    max-width: 100%;
-    padding: 1rem 2rem;
+    max-width: 1100px;
+    margin: auto;
+    padding-top: 2rem;
+    padding-bottom: 2rem;
 }
+
 .card {
     background-color: #1C1F26;
     padding: 20px;
     border-radius: 12px;
     text-align: center;
+    height: 120px;
 }
+
+@media (max-width: 768px) {
+    .block-container {
+        padding: 1rem;
+    }
+}
+
 h1, h2, h3 {
     text-align: center;
 }
@@ -39,7 +50,7 @@ h1, h2, h3 {
 """, unsafe_allow_html=True)
 
 # ======================
-# LOAD DATA (CACHED)
+# LOAD DATA
 # ======================
 file_path = os.path.join(os.path.dirname(__file__), "data.csv")
 
@@ -114,9 +125,8 @@ def train_models(data):
             "mae": mean_absolute_error(actual, predicted)
         }
 
-    # ✅ BEST MODEL SELECTION
-    best_model_name = max(results, key=lambda x: results[x]["r2"])
-    best_model = results[best_model_name]["model"]
+    best_model_name = "Random Forest"
+    best_model = results["Random Forest"]["model"]
 
     cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
 
@@ -134,8 +144,12 @@ st.markdown("""
 <h3 style='color:#00FFAA;'>Smart ML-Based Rent Estimation System</h3>
 """, unsafe_allow_html=True)
 
+st.markdown("<br>", unsafe_allow_html=True)
+
+# ======================
 # KPI CARDS
-col1, col2, col3 = st.columns([1,1,1], gap="large")
+# ======================
+col1, col2, col3 = st.columns(3, gap="medium")
 
 with col1:
     st.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -160,7 +174,7 @@ menu = st.sidebar.radio("", ["📊 EDA", "🤖 Model", "🏠 Prediction"])
 if menu == "📊 EDA":
     st.markdown("## 📊 Exploratory Data Analysis")
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2, gap="large")
 
     with col1:
         st.markdown("#### Rent Distribution")
@@ -181,36 +195,20 @@ elif menu == "🤖 Model":
 
     result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
     result_df.columns = ["R² Score", "RMSE", "MAE"]
-
     st.dataframe(result_df)
 
     st.success(f"✔ Final Model: {best_model_name}")
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
-    # 📊 Comparison Chart
-    fig = px.bar(result_df, barmode="group")
-    st.plotly_chart(fig)
-
-    # 📉 Actual vs Predicted
     y_pred = model.predict(X_test)
     actual = np.expm1(y_test)
     predicted = np.expm1(y_pred)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers', name="Predicted"))
-    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines', name="Perfect Fit"))
-
+    fig.add_trace(go.Scatter(x=actual, y=predicted, mode='markers'))
+    fig.add_trace(go.Scatter(x=actual, y=actual, mode='lines'))
     fig.update_layout(title="Actual vs Predicted Rent")
     st.plotly_chart(fig)
-
-    # ⭐ Feature Importance
-    if hasattr(model, "feature_importances_"):
-        importances = model.feature_importances_
-        feat_df = pd.DataFrame({"Feature": feature_cols, "Importance": importances})
-        feat_df = feat_df.sort_values(by="Importance", ascending=False).head(10)
-
-        fig = px.bar(feat_df, x="Importance", y="Feature", orientation='h')
-        st.plotly_chart(fig)
 
 # ======================
 # PREDICTION
@@ -243,8 +241,6 @@ elif menu == "🏠 Prediction":
         input_df["room_density"] = area / (bedrooms + 1)
         input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
         input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
-
-        # ✅ safer locality encoding
         input_df["locality_target"] = df["locality_target"].mean()
 
         for col in feature_cols:
@@ -257,7 +253,7 @@ elif menu == "🏠 Prediction":
 
         st.markdown(f"""
         <div style="display:flex;justify-content:center;">
-        <div style="background-color:#1C1F26;padding:25px;border-radius:12px;width:300px;text-align:center;">
+        <div style="background-color:#1C1F26;padding:25px;border-radius:12px;width:100%;max-width:350px;text-align:center;">
         <h2 style="color:#00FFAA;">₹{int(prediction)}</h2>
         <p>Estimated Monthly Rent</p>
         </div>
