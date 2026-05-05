@@ -27,7 +27,7 @@ df = pd.read_csv(file_path)
 # CLEANING
 # ======================
 
-# Fill missing values instead of dropping
+# Fill missing values
 df.fillna(df.median(numeric_only=True), inplace=True)
 
 # IQR OUTLIER REMOVAL
@@ -65,13 +65,20 @@ def train_models(data):
 
     models = {
         "Linear Regression": LinearRegression(),
-        "Decision Tree": DecisionTreeRegressor(max_depth=10, random_state=42),
+
+        "Decision Tree": DecisionTreeRegressor(
+            max_depth=10,
+            random_state=42
+        ),
+
+        # 🔥 IMPROVED RANDOM FOREST
         "Random Forest": RandomForestRegressor(
-            n_estimators=200,
+            n_estimators=300,          # Increased from 200 → 300
             max_depth=15,
             min_samples_split=5,
             min_samples_leaf=2,
-            random_state=42
+            random_state=42,
+            n_jobs=-1                  # Use all CPU cores (faster)
         )
     }
 
