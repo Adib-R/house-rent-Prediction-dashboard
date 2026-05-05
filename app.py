@@ -5,7 +5,7 @@ import os
 import plotly.express as px
 import plotly.graph_objects as go
 
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 
@@ -26,16 +26,12 @@ df = pd.read_csv(file_path)
 # ======================
 # CLEANING
 # ======================
-
-# Fill missing values
 df.fillna(df.median(numeric_only=True), inplace=True)
 
-# IQR OUTLIER REMOVAL
-Q1 = df["rent"].quantile(0.25)
-Q3 = df["rent"].quantile(0.75)
-IQR = Q3 - Q1
-
-df = df[(df["rent"] >= Q1 - 1.5 * IQR) & (df["rent"] <= Q3 + 1.5 * IQR)]
+# CLIP OUTLIERS (better than removing)
+lower = df["rent"].quantile(0.01)
+upper = df["rent"].quantile(0.99)
+df["rent"] = df["rent"].clip(lower, upper)
 
 # ======================
 # FEATURE ENGINEERING
@@ -43,9 +39,13 @@ df = df[(df["rent"] >= Q1 - 1.5 * IQR) & (df["rent"] <= Q3 + 1.5 * IQR)]
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
 
-# Frequency encoding
-freq = df["locality"].value_counts()
-df["locality_freq"] = df["locality"].map(freq)
+# NEW FEATURES 🔥
+df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
+df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
+
+# TARGET ENCODING (IMPORTANT)
+locality_mean = df.groupby("locality")["rent"].mean()
+df["locality_target"] = df["locality"].map(locality_mean)
 
 # ======================
 # MODEL TRAINING
@@ -67,18 +67,27 @@ def train_models(data):
         "Linear Regression": LinearRegression(),
 
         "Decision Tree": DecisionTreeRegressor(
-            max_depth=10,
+            max_depth=12,
             random_state=42
         ),
 
         # 🔥 IMPROVED RANDOM FOREST
         "Random Forest": RandomForestRegressor(
-            n_estimators=300,          # Increased from 200 → 300
-            max_depth=15,
-            min_samples_split=5,
-            min_samples_leaf=2,
+            n_estimators=400,
+            max_depth=20,
+            min_samples_split=4,
+            min_samples_leaf=1,
+            max_features="sqrt",
             random_state=42,
-            n_jobs=-1                  # Use all CPU cores (faster)
+            n_jobs=-1
+        ),
+
+        # 🔥 NEW MODEL (VERY IMPORTANT)
+        "Gradient Boosting": GradientBoostingRegressor(
+            n_estimators=300,
+            learning_rate=0.05,
+            max_depth=4,
+            random_state=42
         )
     }
 
@@ -102,12 +111,12 @@ def train_models(data):
             "mae": mae
         }
 
-    # Best model
+    # Best model selection
     best_model_name = max(results, key=lambda x: results[x]["r2"])
     best_model = results[best_model_name]["model"]
 
-    # Cross-validation using BEST model
-    cv_score = cross_val_score(best_model, X, y, cv=5, scoring="r2").mean()
+    # Cross-validation
+    cv_score = cross_val_score(best_model, X_train, y_train, cv=5, scoring="r2").mean()
 
     return best_model, best_model_name, results, X.columns, X_test, y_test, cv_score
 
@@ -142,13 +151,6 @@ if menu == "EDA":
         fig = px.bar(city_avg, x="city", y="rent", title="Average Rent by City")
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("""
-    ### Key Insights
-    - Area significantly affects rent  
-    - Bathrooms increase rent value  
-    - Location and city influence pricing  
-    """)
-
 # ======================
 # MODEL
 # ======================
@@ -163,7 +165,6 @@ elif menu == "Model":
     st.success(f"Best Model: {best_model_name}")
     st.info(f"Cross Validation Score (R²): {cv_score:.2f}")
 
-    # Graph
     y_pred = model.predict(X_test)
 
     actual = np.expm1(y_test)
@@ -181,7 +182,6 @@ elif menu == "Model":
 
     st.plotly_chart(fig)
 
-    # Feature importance (safe)
     if hasattr(model, "feature_importances_"):
         importance = pd.DataFrame({
             "Feature": feature_cols,
@@ -222,8 +222,10 @@ elif menu == "Prediction":
         input_df["beds"] = bedrooms
         input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
         input_df["room_density"] = area / (bedrooms + 1)
+        input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
+        input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
 
-        input_df["locality_freq"] = df[df["city"] == city]["locality_freq"].mean()
+        input_df["locality_target"] = df[df["city"] == city]["locality_target"].mean()
 
         for col in feature_cols:
             if col == f"city_{city}":
