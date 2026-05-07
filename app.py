@@ -11,14 +11,18 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
+# ---------------------------------------------------
 # PAGE CONFIG
+# ---------------------------------------------------
 
 st.set_page_config(
     page_title="Indian House Rent Prediction Dashboard",
     layout="wide"
 )
 
+# ---------------------------------------------------
 # CUSTOM CSS
+# ---------------------------------------------------
 
 st.markdown("""
 <style>
@@ -121,7 +125,9 @@ section[data-testid="stSidebar"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ---------------------------------------------------
 # LOAD DATA
+# ---------------------------------------------------
 
 @st.cache_data
 def load_data():
@@ -129,7 +135,9 @@ def load_data():
 
 df = load_data()
 
+# ---------------------------------------------------
 # DATA CLEANING
+# ---------------------------------------------------
 
 df.fillna(df.median(numeric_only=True), inplace=True)
 
@@ -138,21 +146,34 @@ df["rent"] = df["rent"].clip(
     df["rent"].quantile(0.99)
 )
 
+# ---------------------------------------------------
 # FEATURE ENGINEERING
+# ---------------------------------------------------
 
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
+
 df["room_density"] = df["area"] / (df["beds"] + 1)
+
 df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
-df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
 
-df["locality_target"] = df.groupby("locality")["rent"].transform("mean")
+df["area_per_room"] = df["area"] / (
+    df["beds"] + df["bathrooms"] + 1
+)
 
+df["locality_target"] = (
+    df.groupby("locality")["rent"].transform("mean")
+)
+
+# ---------------------------------------------------
 # MODEL TRAINING
+# ---------------------------------------------------
 
 @st.cache_resource
 def train_models(data):
 
-    df_ml = data.drop(columns=["house_type", "area_rate", "locality"])
+    df_ml = data.drop(
+        columns=["house_type", "area_rate", "locality"]
+    )
 
     df_ml = pd.get_dummies(df_ml, drop_first=True)
 
@@ -168,6 +189,7 @@ def train_models(data):
     )
 
     models = {
+
         "Linear Regression": LinearRegression(),
 
         "Decision Tree": DecisionTreeRegressor(
@@ -192,6 +214,7 @@ def train_models(data):
         pred = model.predict(X_test)
 
         actual = np.expm1(y_test)
+
         predicted = np.expm1(pred)
 
         results[name] = {
@@ -211,20 +234,83 @@ def train_models(data):
         scoring="r2"
     ).mean()
 
-    return best_model, results, X.columns, X_test, y_test, cv_score
+    return (
+        best_model,
+        results,
+        X.columns,
+        X_test,
+        y_test,
+        cv_score
+    )
 
 model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
+# ---------------------------------------------------
+# COMMON PLOT STYLE
+# ---------------------------------------------------
+
+def update_plot_style(fig):
+
+    fig.update_layout(
+
+        plot_bgcolor="white",
+        paper_bgcolor="#EDF6F9",
+
+        font=dict(
+            color="#006D77",
+            size=14
+        ),
+
+        xaxis=dict(
+            title_font=dict(
+                color="#006D77",
+                size=16
+            ),
+            tickfont=dict(
+                color="#006D77",
+                size=13
+            ),
+            showgrid=False
+        ),
+
+        yaxis=dict(
+            title_font=dict(
+                color="#006D77",
+                size=16
+            ),
+            tickfont=dict(
+                color="#006D77",
+                size=13
+            ),
+            showgrid=True,
+            gridcolor="#D9EAEA"
+        ),
+
+        margin=dict(
+            l=80,
+            r=40,
+            t=60,
+            b=60
+        )
+    )
+
+    return fig
+
+# ---------------------------------------------------
 # HEADER
+# ---------------------------------------------------
 
 st.markdown("""
 <h1>Indian House Rent Prediction System</h1>
+
 <h3 style='color:#83C5BE;'>
 Machine Learning-Based Rental Price Estimation
 </h3>
 """, unsafe_allow_html=True)
 
+# ---------------------------------------------------
 # KPI SECTION
+# ---------------------------------------------------
 
 col1, col2, col3 = st.columns(3)
 
@@ -260,7 +346,9 @@ col3.markdown(
 
 st.markdown("---")
 
-# SIDEBAR NAVIGATION
+# ---------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------
 
 menu = st.sidebar.radio(
     "Navigation Menu",
@@ -271,13 +359,17 @@ menu = st.sidebar.radio(
     ]
 )
 
+# ---------------------------------------------------
 # EDA SECTION
+# ---------------------------------------------------
 
 if menu == "Exploratory Data Analysis":
 
     st.markdown("## Exploratory Data Analysis")
 
     col1, col2 = st.columns(2)
+
+    # RENT DISTRIBUTION
 
     with col1:
 
@@ -290,35 +382,40 @@ if menu == "Exploratory Data Analysis":
             color_discrete_sequence=["#006D77"]
         )
 
-        fig.update_layout(
-            plot_bgcolor="white",
-            paper_bgcolor="#EDF6F9"
-        )
+        fig = update_plot_style(fig)
 
         st.plotly_chart(fig, use_container_width=True)
+
+    # CITY RENT
 
     with col2:
 
         st.markdown("### Average Rent by City")
 
-        city_avg = df.groupby("city")["rent"].mean().reset_index()
+        city_avg = (
+            df.groupby("city")["rent"]
+            .mean()
+            .reset_index()
+        )
 
         fig = px.bar(
             city_avg,
             x="city",
             y="rent",
             color="rent",
-            color_continuous_scale=["#83C5BE", "#006D77"]
+            color_continuous_scale=[
+                "#83C5BE",
+                "#006D77"
+            ]
         )
 
-        fig.update_layout(
-            plot_bgcolor="white",
-            paper_bgcolor="#EDF6F9"
-        )
+        fig = update_plot_style(fig)
 
         st.plotly_chart(fig, use_container_width=True)
 
+# ---------------------------------------------------
 # MODEL EVALUATION
+# ---------------------------------------------------
 
 elif menu == "Model Evaluation":
 
@@ -336,9 +433,13 @@ elif menu == "Model Evaluation":
 
     st.dataframe(result_df, use_container_width=True)
 
-    st.success("Final Selected Model: Random Forest Regressor")
+    st.success(
+        "Final Selected Model: Random Forest Regressor"
+    )
 
-    st.info(f"Cross-Validation Score (R²): {cv_score:.2f}")
+    st.info(
+        f"Cross-Validation Score (R²): {cv_score:.2f}"
+    )
 
     # R2 GRAPH
 
@@ -361,11 +462,9 @@ elif menu == "Model Evaluation":
         ]
     )
 
-    fig.update_layout(
-        yaxis_range=[0, 1],
-        plot_bgcolor="white",
-        paper_bgcolor="#EDF6F9"
-    )
+    fig.update_layout(yaxis_range=[0, 1])
+
+    fig = update_plot_style(fig)
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -386,7 +485,10 @@ elif menu == "Model Evaluation":
         value_name="Value"
     )
 
-    error_df.rename(columns={"index": "Model"}, inplace=True)
+    error_df.rename(
+        columns={"index": "Model"},
+        inplace=True
+    )
 
     fig = px.bar(
         error_df,
@@ -400,20 +502,20 @@ elif menu == "Model Evaluation":
         ]
     )
 
-    fig.update_layout(
-        plot_bgcolor="white",
-        paper_bgcolor="#EDF6F9"
-    )
+    fig = update_plot_style(fig)
 
     st.plotly_chart(fig, use_container_width=True)
 
     # ACTUAL VS PREDICTED
 
-    st.markdown("### Actual vs Predicted Rental Prices")
+    st.markdown(
+        "### Actual vs Predicted Rental Prices"
+    )
 
     y_pred = model.predict(X_test)
 
     actual = np.expm1(y_test)
+
     predicted = np.expm1(y_pred)
 
     fig = go.Figure()
@@ -439,9 +541,11 @@ elif menu == "Model Evaluation":
     )
 
     fig.update_layout(
-        plot_bgcolor="white",
-        paper_bgcolor="#EDF6F9"
+        xaxis_title="Actual Rent",
+        yaxis_title="Predicted Rent"
     )
+
+    fig = update_plot_style(fig)
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -449,11 +553,17 @@ elif menu == "Model Evaluation":
 
     if hasattr(model, "feature_importances_"):
 
-        st.markdown("### Feature Importance Analysis")
+        st.markdown(
+            "### Feature Importance Analysis"
+        )
 
         feat_df = pd.DataFrame({
+
             "Feature": feature_cols,
-            "Importance": model.feature_importances_
+
+            "Importance":
+            model.feature_importances_
+
         }).sort_values(
             by="Importance",
             ascending=False
@@ -465,17 +575,19 @@ elif menu == "Model Evaluation":
             y="Feature",
             orientation='h',
             color="Importance",
-            color_continuous_scale=["#83C5BE", "#006D77"]
+            color_continuous_scale=[
+                "#83C5BE",
+                "#006D77"
+            ]
         )
 
-        fig.update_layout(
-            plot_bgcolor="white",
-            paper_bgcolor="#EDF6F9"
-        )
+        fig = update_plot_style(fig)
 
         st.plotly_chart(fig, use_container_width=True)
 
+# ---------------------------------------------------
 # RENT PREDICTION
+# ---------------------------------------------------
 
 elif menu == "Rent Prediction":
 
@@ -526,22 +638,30 @@ elif menu == "Rent Prediction":
         )
 
         input_df["area"] = area
+
         input_df["bathrooms"] = bathrooms
+
         input_df["beds"] = bedrooms
 
-        input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
+        input_df["bath_per_bed"] = (
+            bathrooms / (bedrooms + 1)
+        )
 
-        input_df["room_density"] = area / (bedrooms + 1)
+        input_df["room_density"] = (
+            area / (bedrooms + 1)
+        )
 
-        input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
+        input_df["bed_bath_ratio"] = (
+            bedrooms / (bathrooms + 1)
+        )
 
         input_df["area_per_room"] = area / (
             bedrooms + bathrooms + 1
         )
 
-        input_df["locality_target"] = df[
-            "locality_target"
-        ].mean()
+        input_df["locality_target"] = (
+            df["locality_target"].mean()
+        )
 
         for col in feature_cols:
 
@@ -567,7 +687,9 @@ elif menu == "Rent Prediction":
             unsafe_allow_html=True
         )
 
+# ---------------------------------------------------
 # FOOTER
+# ---------------------------------------------------
 
 st.markdown("---")
 
