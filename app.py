@@ -35,26 +35,26 @@ st.markdown("""
 
 /* PAGE CONTAINER */
 .block-container {
-    max-width: 1100px;
+    max-width: 1150px;
     margin: auto;
-    padding-top: 1.5rem;
+    padding-top: 1rem;
 }
 
 /* KPI CARDS */
 .card {
     background: linear-gradient(135deg, #006D77, #83C5BE);
-    padding: 20px;
-    border-radius: 16px;
+    padding: 22px;
+    border-radius: 18px;
     text-align: center;
     color: white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.12);
 }
 
 /* HEADINGS */
 h1 {
     text-align: center;
     color: #006D77;
-    font-weight: 700;
+    font-weight: 800;
 }
 
 h2, h3 {
@@ -67,13 +67,13 @@ section[data-testid="stSidebar"] {
     background-color: #FFDDD2;
 }
 
-/* BUTTONS */
+/* BUTTON */
 .stButton>button {
     background-color: #006D77;
     color: white;
-    border-radius: 10px;
+    border-radius: 12px;
     border: none;
-    padding: 0.6rem 1rem;
+    padding: 0.7rem 1rem;
     font-weight: 600;
     transition: 0.3s;
 }
@@ -84,9 +84,9 @@ section[data-testid="stSidebar"] {
 }
 
 /* INPUTS */
-.stSelectbox div[data-baseweb="select"],
+.stTextInput input,
 .stNumberInput input,
-.stSlider {
+.stSelectbox div[data-baseweb="select"] {
     border-radius: 10px;
 }
 
@@ -99,12 +99,12 @@ section[data-testid="stSidebar"] {
 /* PREDICTION CARD */
 .prediction-card {
     background: linear-gradient(135deg, #006D77, #83C5BE);
-    padding: 25px;
-    border-radius: 16px;
-    width: 320px;
+    padding: 30px;
+    border-radius: 18px;
+    width: 340px;
     text-align: center;
     color: white;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
 }
 
 /* FOOTER */
@@ -115,10 +115,15 @@ section[data-testid="stSidebar"] {
     margin-top: 20px;
 }
 
-/* MOBILE RESPONSIVE */
+/* MOBILE */
 @media (max-width: 768px) {
+
     .block-container {
         padding: 1rem;
+    }
+
+    .prediction-card {
+        width: 100%;
     }
 }
 
@@ -254,43 +259,68 @@ def update_plot_style(fig):
     fig.update_layout(
 
         plot_bgcolor="white",
-        paper_bgcolor="#EDF6F9",
+        paper_bgcolor="white",
 
         font=dict(
+            family="Arial",
             color="#006D77",
             size=14
         ),
 
+        title_font=dict(
+            size=22,
+            color="#006D77"
+        ),
+
         xaxis=dict(
-            title_font=dict(
-                color="#006D77",
-                size=16
-            ),
+            showgrid=False,
+            zeroline=False,
+            linecolor="#83C5BE",
             tickfont=dict(
                 color="#006D77",
                 size=13
             ),
-            showgrid=False
+            title_font=dict(
+                color="#006D77",
+                size=16
+            )
         ),
 
         yaxis=dict(
-            title_font=dict(
-                color="#006D77",
-                size=16
-            ),
+            showgrid=True,
+            gridcolor="#E6F2F1",
+            zeroline=False,
+            linecolor="#83C5BE",
             tickfont=dict(
                 color="#006D77",
                 size=13
             ),
-            showgrid=True,
-            gridcolor="#D9EAEA"
+            title_font=dict(
+                color="#006D77",
+                size=16
+            )
+        ),
+
+        legend=dict(
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="#83C5BE",
+            borderwidth=1,
+            font=dict(
+                color="#006D77"
+            )
         ),
 
         margin=dict(
-            l=80,
+            l=70,
             r=40,
             t=60,
             b=60
+        ),
+
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=13,
+            font_color="#006D77"
         )
     )
 
@@ -347,7 +377,7 @@ col3.markdown(
 st.markdown("---")
 
 # ---------------------------------------------------
-# SIDEBAR
+# SIDEBAR MENU
 # ---------------------------------------------------
 
 menu = st.sidebar.radio(
@@ -369,8 +399,6 @@ if menu == "Exploratory Data Analysis":
 
     col1, col2 = st.columns(2)
 
-    # RENT DISTRIBUTION
-
     with col1:
 
         st.markdown("### Distribution of Rental Prices")
@@ -385,8 +413,6 @@ if menu == "Exploratory Data Analysis":
         fig = update_plot_style(fig)
 
         st.plotly_chart(fig, use_container_width=True)
-
-    # CITY RENT
 
     with col2:
 
@@ -404,6 +430,7 @@ if menu == "Exploratory Data Analysis":
             y="rent",
             color="rent",
             color_continuous_scale=[
+                "#B7E4DD",
                 "#83C5BE",
                 "#006D77"
             ]
@@ -441,7 +468,7 @@ elif menu == "Model Evaluation":
         f"Cross-Validation Score (R²): {cv_score:.2f}"
     )
 
-    # R2 GRAPH
+    # R² GRAPH
 
     st.markdown("### R² Score Comparison Across Models")
 
@@ -454,15 +481,15 @@ elif menu == "Model Evaluation":
         x="Model",
         y="R² Score",
         color="Model",
-        text_auto=True,
+        text_auto=".2f",
         color_discrete_sequence=[
             "#006D77",
             "#83C5BE",
-            "#FFDDD2"
+            "#E29578"
         ]
     )
 
-    fig.update_layout(yaxis_range=[0, 1])
+    fig.update_layout(yaxis_range=[-0.5, 1.2])
 
     fig = update_plot_style(fig)
 
@@ -498,7 +525,7 @@ elif menu == "Model Evaluation":
         barmode="group",
         color_discrete_sequence=[
             "#006D77",
-            "#83C5BE"
+            "#E29578"
         ]
     )
 
@@ -526,7 +553,11 @@ elif menu == "Model Evaluation":
             y=predicted,
             mode='markers',
             name="Predicted Values",
-            marker=dict(color="#006D77")
+            marker=dict(
+                color="#006D77",
+                size=8,
+                opacity=0.7
+            )
         )
     )
 
@@ -536,7 +567,10 @@ elif menu == "Model Evaluation":
             y=actual,
             mode='lines',
             name="Ideal Prediction Line",
-            line=dict(color="#83C5BE")
+            line=dict(
+                color="#E29578",
+                width=3
+            )
         )
     )
 
@@ -576,6 +610,7 @@ elif menu == "Model Evaluation":
             orientation='h',
             color="Importance",
             color_continuous_scale=[
+                "#B7E4DD",
                 "#83C5BE",
                 "#006D77"
             ]
@@ -638,9 +673,7 @@ elif menu == "Rent Prediction":
         )
 
         input_df["area"] = area
-
         input_df["bathrooms"] = bathrooms
-
         input_df["beds"] = bedrooms
 
         input_df["bath_per_bed"] = (
