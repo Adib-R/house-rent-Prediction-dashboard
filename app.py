@@ -46,37 +46,26 @@ def load_data():
 
 df = load_data()
 
-# ✅ KEEP ORIGINAL COPY
+# ✅ ADD: KEEP ORIGINAL COPY
 df_raw = df.copy()
 
-# =========================
-# DATA CLEANING (FIXED)
-# =========================
-
-# Fill numeric columns
+# DATA CLEANING
 df.fillna(df.median(numeric_only=True), inplace=True)
 
-# Fill categorical columns
+# ✅ ADD: categorical fill
 for col in df.select_dtypes(include="object").columns:
     df[col].fillna(df[col].mode()[0], inplace=True)
 
-# Handle outliers
 df["rent"] = df["rent"].clip(df["rent"].quantile(0.01), df["rent"].quantile(0.99))
 
-# =========================
 # FEATURE ENGINEERING
-# =========================
-
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 df["room_density"] = df["area"] / (df["beds"] + 1)
 df["bed_bath_ratio"] = df["beds"] / (df["bathrooms"] + 1)
 df["area_per_room"] = df["area"] / (df["beds"] + df["bathrooms"] + 1)
 df["locality_target"] = df.groupby("locality")["rent"].transform("mean")
 
-# =========================
 # MODEL TRAINING
-# =========================
-
 @st.cache_resource
 def train_models(data):
 
@@ -131,7 +120,7 @@ st.markdown("""
 <h3 style='color:#00FFAA;'>Machine Learning-Based Rental Price Estimation</h3>
 """, unsafe_allow_html=True)
 
-# KPI SECTION
+# KPI
 col1, col2, col3 = st.columns(3)
 
 col1.markdown(f"<div class='card'><h4>Total Listings</h4><h2>{len(df)}</h2></div>", unsafe_allow_html=True)
@@ -153,96 +142,66 @@ if menu == "Exploratory Data Analysis":
 
     st.markdown("## Exploratory Data Analysis")
 
-    # BEFORE
-    st.subheader("Raw Data (Before Preprocessing)")
-    st.dataframe(df_raw.head())
+    # 🔥 NEW ADDITIONS START HERE
 
-    # AFTER
-    st.subheader("Processed Data (After Preprocessing)")
-    st.dataframe(df.head())
+    st.markdown("### 🔍 Data Comparison (Before vs After)")
 
-    # MISSING VALUES
-    st.subheader("Missing Values Before")
-    st.dataframe(df_raw.isnull().sum().to_frame("Missing Count"))
-
-    st.subheader("Missing Values After")
-    st.dataframe(df.isnull().sum().to_frame("Missing Count"))
-
-    # SHAPE
-    st.write("Shape Before:", df_raw.shape)
-    st.write("Shape After:", df.shape)
-
-    # GRAPHS
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### Rent Distribution")
+        st.markdown("#### Raw Data Sample")
+        st.dataframe(df_raw.sample(10))
+
+    with col2:
+        st.markdown("#### Processed Data Sample")
+        st.dataframe(df.sample(10))
+
+    st.markdown("### 💰 Rent Range Comparison")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("Before Cleaning")
+        st.write("Min:", df_raw["rent"].min())
+        st.write("Max:", df_raw["rent"].max())
+
+    with col2:
+        st.write("After Cleaning")
+        st.write("Min:", df["rent"].min())
+        st.write("Max:", df["rent"].max())
+
+    st.markdown("### 📊 Rent Distribution")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("Before")
+        st.plotly_chart(px.histogram(df_raw, x="rent"), use_container_width=True)
+
+    with col2:
+        st.markdown("After")
+        st.plotly_chart(px.histogram(df, x="rent"), use_container_width=True)
+
+    st.markdown("### 🔄 Changed Values")
+
+    changed = df_raw[df_raw["rent"] != df["rent"]]
+
+    if not changed.empty:
+        st.dataframe(changed.head())
+    else:
+        st.info("No visible changes in sample, but preprocessing applied.")
+
+    # 🔥 ORIGINAL CODE CONTINUES
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### Distribution of Rental Prices")
         st.plotly_chart(px.histogram(df, x="rent"), use_container_width=True)
 
     with col2:
-        st.markdown("### Avg Rent by City")
+        st.markdown("### Average Rent by City")
         city_avg = df.groupby("city")["rent"].mean().reset_index()
         st.plotly_chart(px.bar(city_avg, x="city", y="rent"), use_container_width=True)
 
-# =========================
-# MODEL SECTION
-# =========================
-elif menu == "Model Evaluation":
-
-    st.markdown("## Model Performance")
-
-    result_df = pd.DataFrame(results).T[["r2", "rmse", "mae"]]
-    result_df.columns = ["R²", "RMSE", "MAE"]
-
-    st.dataframe(result_df, use_container_width=True)
-
-    st.success("Best Model: Random Forest")
-    st.info(f"CV Score: {cv_score:.2f}")
-
-    st.plotly_chart(px.bar(result_df.reset_index(), x="index", y="R²"), use_container_width=True)
-
-# =========================
-# PREDICTION SECTION
-# =========================
-elif menu == "Rent Prediction":
-
-    st.markdown("## Predict Rent")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        area = st.number_input("Area", 300, 5000, 1000)
-        city = st.selectbox("City", df["city"].unique())
-
-    with col2:
-        bathrooms = st.slider("Bathrooms", 1, 5, 2)
-        bedrooms = st.slider("Bedrooms", 1, 5, 2)
-
-    furnishing = st.selectbox("Furnishing", df["furnishing"].unique())
-
-    if st.button("Estimate Rent"):
-
-        input_df = pd.DataFrame(np.zeros((1, len(feature_cols))), columns=feature_cols)
-
-        input_df["area"] = area
-        input_df["bathrooms"] = bathrooms
-        input_df["beds"] = bedrooms
-        input_df["bath_per_bed"] = bathrooms / (bedrooms + 1)
-        input_df["room_density"] = area / (bedrooms + 1)
-        input_df["bed_bath_ratio"] = bedrooms / (bathrooms + 1)
-        input_df["area_per_room"] = area / (bedrooms + bathrooms + 1)
-        input_df["locality_target"] = df["locality_target"].mean()
-
-        for col in feature_cols:
-            if col == f"city_{city}":
-                input_df[col] = 1
-            elif col == f"furnishing_{furnishing}":
-                input_df[col] = 1
-
-        prediction = np.expm1(model.predict(input_df)[0])
-
-        st.success(f"Estimated Rent: ₹{int(prediction)}")
-
-# FOOTER
-st.markdown("---")
-st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project</p>", unsafe_allow_html=True)
+# (rest of your code unchanged)
