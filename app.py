@@ -247,4 +247,4 @@ elif menu == "Rent Prediction":
 
 # FOOTER
 st.markdown("---")
-st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:gray;'>PT-2 Project </p>", unsafe_allow_html=True)
