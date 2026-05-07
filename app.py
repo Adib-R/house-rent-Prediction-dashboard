@@ -11,27 +11,27 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
-# ============================================
+# =========================================================
 # PAGE CONFIG
-# ============================================
+# =========================================================
 
 st.set_page_config(
     page_title="Indian House Rent Prediction Dashboard",
     layout="wide"
 )
 
-# ============================================
+# =========================================================
 # LIGHT THEME COLORS
-# ============================================
+# =========================================================
 
 BACKGROUND = "#F5F7FA"
 CARD = "#FFFFFF"
 TEXT = "#111111"
 ACCENT = "#0077CC"
 
-# ============================================
+# =========================================================
 # CUSTOM CSS
-# ============================================
+# =========================================================
 
 st.markdown(f"""
 <style>
@@ -41,7 +41,7 @@ st.markdown(f"""
 }}
 
 .block-container {{
-    max-width: 1100px;
+    max-width: 1150px;
     margin: auto;
     padding-top: 1.5rem;
 }}
@@ -54,7 +54,7 @@ st.markdown(f"""
     box-shadow: 0 2px 10px rgba(0,0,0,0.08);
 }}
 
-h1, h2, h3, h4, h5, h6, p {{
+h1, h2, h3, h4, h5, h6, p, label {{
     color: {TEXT};
 }}
 
@@ -76,6 +76,15 @@ h1, h2, h3, h4, h5, h6, p {{
     opacity: 0.9;
 }}
 
+div[data-baseweb="select"] > div {{
+    background-color: white;
+    color: black;
+}}
+
+input, textarea {{
+    color: black !important;
+}}
+
 @media (max-width: 768px) {{
     .block-container {{
         padding: 1rem;
@@ -85,9 +94,9 @@ h1, h2, h3, h4, h5, h6, p {{
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================
+# =========================================================
 # LOAD DATA
-# ============================================
+# =========================================================
 
 @st.cache_data
 def load_data():
@@ -95,9 +104,9 @@ def load_data():
 
 df = load_data()
 
-# ============================================
+# =========================================================
 # DATA CLEANING
-# ============================================
+# =========================================================
 
 df.fillna(df.median(numeric_only=True), inplace=True)
 
@@ -106,9 +115,9 @@ df["rent"] = df["rent"].clip(
     df["rent"].quantile(0.99)
 )
 
-# ============================================
+# =========================================================
 # FEATURE ENGINEERING
-# ============================================
+# =========================================================
 
 df["bath_per_bed"] = df["bathrooms"] / (df["beds"] + 1)
 
@@ -126,9 +135,9 @@ df["locality_target"] = (
     .transform("mean")
 )
 
-# ============================================
+# =========================================================
 # MODEL TRAINING
-# ============================================
+# =========================================================
 
 @st.cache_resource
 def train_models(data):
@@ -219,9 +228,9 @@ def train_models(data):
 
 model, results, feature_cols, X_test, y_test, cv_score = train_models(df)
 
-# ============================================
+# =========================================================
 # HEADER
-# ============================================
+# =========================================================
 
 st.markdown(f"""
 <h1 style='text-align:center;color:{TEXT};'>
@@ -233,9 +242,9 @@ Machine Learning-Based Rental Price Estimation
 </h3>
 """, unsafe_allow_html=True)
 
-# ============================================
+# =========================================================
 # KPI SECTION
-# ============================================
+# =========================================================
 
 col1, col2, col3 = st.columns(3)
 
@@ -271,9 +280,9 @@ col3.markdown(
 
 st.markdown("---")
 
-# ============================================
-# SIDEBAR NAVIGATION
-# ============================================
+# =========================================================
+# SIDEBAR MENU
+# =========================================================
 
 menu = st.sidebar.radio(
     "Navigation Menu",
@@ -284,9 +293,39 @@ menu = st.sidebar.radio(
     ]
 )
 
-# ============================================
+# =========================================================
+# COMMON GRAPH STYLE FUNCTION
+# =========================================================
+
+def update_graph(fig):
+
+    fig.update_layout(
+        paper_bgcolor=BACKGROUND,
+        plot_bgcolor=CARD,
+        font_color=TEXT,
+        title_font_color=TEXT,
+        xaxis=dict(
+            showgrid=False,
+            color=TEXT
+        ),
+        yaxis=dict(
+            color=TEXT
+        ),
+        legend=dict(
+            font=dict(color=TEXT)
+        )
+    )
+
+    fig.update_traces(
+        textfont_color="black",
+        textfont_size=14
+    )
+
+    return fig
+
+# =========================================================
 # EDA SECTION
-# ============================================
+# =========================================================
 
 if menu == "Exploratory Data Analysis":
 
@@ -298,13 +337,14 @@ if menu == "Exploratory Data Analysis":
 
         st.markdown("### Distribution of Rental Prices")
 
-        fig = px.histogram(df, x="rent")
-
-        fig.update_layout(
-            paper_bgcolor=BACKGROUND,
-            plot_bgcolor=CARD,
-            font_color=TEXT
+        fig = px.histogram(
+            df,
+            x="rent",
+            nbins=30,
+            text_auto=True
         )
+
+        fig = update_graph(fig)
 
         st.plotly_chart(
             fig,
@@ -324,23 +364,21 @@ if menu == "Exploratory Data Analysis":
         fig = px.bar(
             city_avg,
             x="city",
-            y="rent"
+            y="rent",
+            color="city",
+            text_auto=".0f"
         )
 
-        fig.update_layout(
-            paper_bgcolor=BACKGROUND,
-            plot_bgcolor=CARD,
-            font_color=TEXT
-        )
+        fig = update_graph(fig)
 
         st.plotly_chart(
             fig,
             use_container_width=True
         )
 
-# ============================================
-# MODEL SECTION
-# ============================================
+# =========================================================
+# MODEL EVALUATION
+# =========================================================
 
 elif menu == "Model Evaluation":
 
@@ -352,8 +390,8 @@ elif menu == "Model Evaluation":
 
     result_df.columns = [
         "R² Score",
-        "Root Mean Squared Error (RMSE)",
-        "Mean Absolute Error (MAE)"
+        "RMSE",
+        "MAE"
     ]
 
     st.dataframe(
@@ -369,11 +407,11 @@ elif menu == "Model Evaluation":
         f"Cross-Validation Score (R²): {cv_score:.2f}"
     )
 
+    # =====================================================
     # R² GRAPH
+    # =====================================================
 
-    st.markdown(
-        "### R² Score Comparison Across Models"
-    )
+    st.markdown("### R² Score Comparison")
 
     r2_df = result_df["R² Score"].reset_index()
 
@@ -387,32 +425,34 @@ elif menu == "Model Evaluation":
         x="Model",
         y="R² Score",
         color="Model",
-        text_auto=True
+        text_auto=".4f"
+    )
+
+    fig.update_traces(
+        textposition="inside",
+        textfont_color="white",
+        textfont_size=16
     )
 
     fig.update_layout(
-        yaxis_range=[0, 1],
-        paper_bgcolor=BACKGROUND,
-        plot_bgcolor=CARD,
-        font_color=TEXT
+        yaxis_range=[0, 1]
     )
+
+    fig = update_graph(fig)
 
     st.plotly_chart(
         fig,
         use_container_width=True
     )
 
+    # =====================================================
     # ERROR GRAPH
+    # =====================================================
 
-    st.markdown(
-        "### Error Metrics Comparison"
-    )
+    st.markdown("### Error Metrics Comparison")
 
     error_df = result_df[
-        [
-            "Root Mean Squared Error (RMSE)",
-            "Mean Absolute Error (MAE)"
-        ]
+        ["RMSE", "MAE"]
     ].reset_index()
 
     error_df = error_df.melt(
@@ -431,25 +471,26 @@ elif menu == "Model Evaluation":
         x="Model",
         y="Value",
         color="Metric",
-        barmode="group"
+        barmode="group",
+        text_auto=".2f"
     )
 
-    fig.update_layout(
-        paper_bgcolor=BACKGROUND,
-        plot_bgcolor=CARD,
-        font_color=TEXT
+    fig.update_traces(
+        textposition="outside"
     )
+
+    fig = update_graph(fig)
 
     st.plotly_chart(
         fig,
         use_container_width=True
     )
 
+    # =====================================================
     # ACTUAL VS PREDICTED
+    # =====================================================
 
-    st.markdown(
-        "### Actual vs Predicted Rental Prices"
-    )
+    st.markdown("### Actual vs Predicted Rental Prices")
 
     y_pred = model.predict(X_test)
 
@@ -464,7 +505,8 @@ elif menu == "Model Evaluation":
             x=actual,
             y=predicted,
             mode='markers',
-            name="Predicted Values"
+            name="Predicted",
+            marker=dict(size=8)
         )
     )
 
@@ -473,28 +515,24 @@ elif menu == "Model Evaluation":
             x=actual,
             y=actual,
             mode='lines',
-            name="Ideal Prediction Line"
+            name="Ideal Line"
         )
     )
 
-    fig.update_layout(
-        paper_bgcolor=BACKGROUND,
-        plot_bgcolor=CARD,
-        font_color=TEXT
-    )
+    fig = update_graph(fig)
 
     st.plotly_chart(
         fig,
         use_container_width=True
     )
 
+    # =====================================================
     # FEATURE IMPORTANCE
+    # =====================================================
 
     if hasattr(model, "feature_importances_"):
 
-        st.markdown(
-            "### Feature Importance Analysis"
-        )
+        st.markdown("### Feature Importance")
 
         feat_df = pd.DataFrame({
 
@@ -511,23 +549,24 @@ elif menu == "Model Evaluation":
             feat_df,
             x="Importance",
             y="Feature",
-            orientation='h'
+            orientation='h',
+            text_auto=".3f"
         )
 
-        fig.update_layout(
-            paper_bgcolor=BACKGROUND,
-            plot_bgcolor=CARD,
-            font_color=TEXT
+        fig.update_traces(
+            textposition="outside"
         )
+
+        fig = update_graph(fig)
 
         st.plotly_chart(
             fig,
             use_container_width=True
         )
 
-# ============================================
+# =========================================================
 # RENT PREDICTION
-# ============================================
+# =========================================================
 
 elif menu == "Rent Prediction":
 
@@ -578,9 +617,7 @@ elif menu == "Rent Prediction":
         )
 
         input_df["area"] = area
-
         input_df["bathrooms"] = bathrooms
-
         input_df["beds"] = bedrooms
 
         input_df["bath_per_bed"] = (
@@ -622,7 +659,7 @@ elif menu == "Rent Prediction":
         background:{CARD};
         padding:25px;
         border-radius:14px;
-        width:300px;
+        width:320px;
         text-align:center;
         box-shadow:0 2px 10px rgba(0,0,0,0.1);
         ">
@@ -631,7 +668,7 @@ elif menu == "Rent Prediction":
         ₹{int(prediction)}
         </h2>
 
-        <p style="color:{TEXT};">
+        <p style="color:{TEXT};font-size:18px;">
         Estimated Monthly Rent
         </p>
 
@@ -639,9 +676,9 @@ elif menu == "Rent Prediction":
         </div>
         """, unsafe_allow_html=True)
 
-# ============================================
+# =========================================================
 # FOOTER
-# ============================================
+# =========================================================
 
 st.markdown("---")
 
