@@ -60,10 +60,10 @@ house_type,locality,city,area,beds,bathrooms,balconies,furnishing,area_rate,rent
 1 BHK House for Rent in Manjari BK Pune,Manjri Budruk,Pune,630.0,1,1,0,Unfurnished,12.0,7500.0
 "3 BHK Flat for Rent in Balagere, Bangalore",Balagere,Bangalore,1700.0,3,3,2,Semi-Furnished,37.0,63000.0
 "1 BHK Flat for Rent in Godrej Tranquil, Lokhandwala Township Kandivali East, Mumbai",Lokhandwala Township Kandivali East,Mumbai,427.0,1,1,0,Unfurnished,80.0,34000.0
-"1 BHK Flat for Rent in Sadoday Palace, Kamptee Road, Nagpur",Kamptee Road,Nagpur,650.0,1,1,0,Unfurnished,13.0,8500.0
-"4 BHK Flat for Rent in Hulimavu, Bangalore",Hulimavu,Bangalore,3560.0,4,5,5,Furnished,37.0,130000.0
+"1 BHK Flat for Rent in Sadoday Palace, Kamptee Road, Nagpur",Kamptee Road,Nagpur,650.0,1,1,0,Unfurnished,13.0,
+"4 BHK Flat for Rent in Hulimavu, Bangalore",Hulimavu,Bangalore,3560.0,4,5,5,,37.0,130000.0
 2 BHK House for Rent in Freedom Fighters Enclave New Delhi,Freedom Fighters Enclave,New Delhi,1250.0,2,2,0,Furnished,28.0,35000.0
-"3 BHK Flat for Rent in Sarjapur Road, Bangalore",Sarjapur Road,Bangalore,1200.0,3,3,2,Furnished,38.0,45000.0
+"3 BHK Flat for Rent in Sarjapur Road, Bangalore",Sarjapur Road,,1200.0,3,3,2,Furnished,38.0,45000.0
 "1 BHK Flat for Rent in Magarpatta City Zinnia, Hadapsar, Pune",Hadapsar,Pune,450.0,1,1,10,Furnished,56.0,25000.0
 "3 BHK Flat for Rent in Begur Road, Bangalore",Begur Road,Bangalore,1631.0,3,2,2,Semi-Furnished,36.0,58000.0
 "2 BHK Flat for Rent in Silver Valley, Wanowrie, Pune",Wanawari,Pune,1200.0,2,2,0,Unfurnished,22.0,27000.0
